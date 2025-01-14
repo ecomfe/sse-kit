@@ -1,0 +1,17 @@
+{
+  "name": "sse-kit",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start:backend": "pnpm --filter local-service run start",
+    "start:frontend": "pnpm --filter taro-demo run dev",
+    "start": "node scripts/start.js"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

@@ -1,0 +1,46 @@
+# Dependency
+node_modules
+
+# System
+.DS_Store
+
+# Log
+/*.log
+
+# IDE
+/.idea
+
+# Build
+*.tgz
+dist
+
+# Test
+/packages/*/coverage
+
+# Env
+.env
+.env.*.local
+
+# vsix 打包用的
+/vsix
+
+# Yarn
+.yarn
+.nx
+# 打包产出
+/packages/*/bundle
+
+.comate
+# 用来测试，不提交
+/plugins/comate-pair/__tests__
+
+output/
+.history
+
+.nvmrc
+.cursorrules
+
+comate-kernel**.tar.gz
+
+kernel
+!packages/kernel
