@@ -1,5 +1,8 @@
-import { PropsWithChildren } from 'react'
+import { Provider } from 'jotai';
 import { useLaunch } from '@tarojs/taro'
+import { PropsWithChildren } from 'react'
+
+import { jotaiStore } from './store';
 import './app.less'
 
 function App({ children }: PropsWithChildren<any>) {
@@ -8,8 +11,9 @@ function App({ children }: PropsWithChildren<any>) {
     console.log('App launched.')
   })
 
-  // children 是将要会渲染的页面
-  return children
+  return (
+    <Provider store={jotaiStore}>{children}</Provider>
+  )
 }
 
 export default App

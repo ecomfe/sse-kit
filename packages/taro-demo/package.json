@@ -55,6 +55,7 @@
     "@tarojs/runtime": "3.6.31",
     "@tarojs/shared": "3.6.31",
     "@tarojs/taro": "3.6.31",
+    "jotai": "^2.11.0",
     "json-buffer": "^3.0.1",
     "react": "^18.0.0",
     "react-dom": "^18.0.0"

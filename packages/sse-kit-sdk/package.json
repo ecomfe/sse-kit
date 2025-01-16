@@ -1,5 +1,5 @@
 {
-  "name": "sse-kit-sdk",
+  "name": "sse-kit",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -9,6 +9,13 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^28.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-typescript": "^12.1.2",
+    "rollup": "^4.30.1",
+    "rollup-plugin-dts": "^6.1.1",
+    "rollup-plugin-terser": "^7.0.2",
     "typescript": "^5.7.3"
   }
 }
