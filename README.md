@@ -1,4 +1,4 @@
-<h1 align="center">SSE-Kit</h1>
+<h1 align="center">SSE-Kit(开发ing)</h1>
 <div align="center">支持 web & 小程序的 SSE SDK</div>
 
 ## 快速开始
