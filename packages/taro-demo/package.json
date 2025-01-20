@@ -58,7 +58,8 @@
     "jotai": "^2.11.0",
     "json-buffer": "^3.0.1",
     "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react-dom": "^18.0.0",
+    "sse-kit": "workspace:*"
   },
   "devDependencies": {
     "@babel/core": "^7.8.0",

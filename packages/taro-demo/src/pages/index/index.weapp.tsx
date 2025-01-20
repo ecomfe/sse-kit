@@ -1,7 +1,7 @@
 import { useLoad } from '@tarojs/taro';
 import { View, Text } from '@tarojs/components'
 import { useAtomValue, useSetAtom } from 'jotai';
-import { SSEProcessor } from 'sse-kit/lib/bundle.h5.esm';
+import { SSEProcessor } from 'sse-kit/lib/bundle.weapp.esm';
 
 import './index.less'
 
@@ -31,7 +31,6 @@ export default function Index() {
           console.error('请求fail:', err);
         }
       })
-      console.info('创建了SSEProcessor', r);
 
       for await (const chunk of r?.message()) {
         console.info('获取到新的 chunk----------:', chunk);

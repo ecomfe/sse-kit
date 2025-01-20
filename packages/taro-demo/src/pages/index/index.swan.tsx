@@ -1,7 +1,7 @@
 import { useLoad } from '@tarojs/taro';
 import { View, Text } from '@tarojs/components'
 import { useAtomValue, useSetAtom } from 'jotai';
-import { SSEProcessor } from 'sse-kit/lib/bundle.h5.esm';
+import { SSEProcessor } from 'sse-kit/lib/bundle.swan.esm';
 
 import './index.less'
 

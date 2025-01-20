@@ -12,4 +12,5 @@ export interface ConstructorArgsType<TBody extends object> {
     onComplete?: () => void;
     onReconnect?: () => void;
     onError?: (err: Error) => void;
+    onHeadersReceived?: (headers: Record<string, string>) => void;
 }

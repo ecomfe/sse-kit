@@ -44,3 +44,5 @@ comate-kernel**.tar.gz
 
 kernel
 !packages/kernel
+
+/packages/*/lib

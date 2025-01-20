@@ -1,14 +1,14 @@
-import dts from "rollup-plugin-dts";
+// import dts from "rollup-plugin-dts";
 import { babel } from '@rollup/plugin-babel';
 import { terser } from "rollup-plugin-terser";
 import commonjs from '@rollup/plugin-commonjs';
 import resolve from '@rollup/plugin-node-resolve';
 import typescript from '@rollup/plugin-typescript';
 
-import { platform } from './config/const';
-import { multiPlatformBuild } from './loaders/index';
+import {platform} from './config/const.js';
+import {multiPlatformBuild} from './loaders/index.js';
 
-function generateConfig(platformItem: string) {
+function generateConfig(platformItem) {
   const jsConfig = {
     input: 'src/entry.ts',
     output: [
@@ -55,11 +55,12 @@ function generateConfig(platformItem: string) {
     ],
     plugins: [
       typescript({ emitDeclarationOnly: true }), // 只生成 .d.ts 文件
-      dts(),
+      // dts(),
     ],
   };
 
-  return [jsConfig, dtsConfig];
+  return [jsConfig];
+  // return [jsConfig, dtsConfig];
 }
 
 export default platform.flatMap(generateConfig);
