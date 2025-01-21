@@ -1,13 +1,17 @@
 export interface RequestStreamingArgs {
     url: `https://${string}`;
     method: 'POST' | 'GET';
-    headers?: Record<string, string>;
+    headers?: Headers;
     reqParams?: Record<string, string>;
     success?: (res: any) => void;
     fail?: (err: any) => void;
 }
 
+export type HeadersReceivedCallbackType = (v: Headers) => void;
+export type ChunkReceivedCallbackType = (v: {data: ArrayBuffer | string}) => void;
+
 export interface RequestStreamingInstance {
-    onChunkReceived: (chunk: any) => void;
-    onHeadersReceived: (headers: any) => void;
+    onChunkReceived: (fn: ChunkReceivedCall) => void;
+    onHeadersReceived: (fn: HeadersReceivedCallbackType) => void;
+    abort: () => void;
 }

@@ -5,17 +5,20 @@ import { encodeBufferToJson } from '../utils/encodeBuffer';
 import { createAsyncQueue } from '../utils/createAsyncQueue';
 
 import type { ISSE, ConstructorArgsType } from './index.d';
+import type {RequestStreamingInstance} from '../utils/requestStreaming/index.d';
 
 export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
     private url: `https://${string}`;
     private method: 'POST' | 'GET';
-    private headers: Record<string, string>;
     private reqParams?: Record<string, string>;
+    private headers: Headers | Record<string, string>;
 
     private body: TBody[] = [];
     private eventId: number = 0;
     private abortControllers: AbortController[] = [];
     private onHeadersReceived?: ConstructorArgsType<TBody>['onHeadersReceived'];
+
+    private requestInstance?: RequestStreamingInstance;
 
 
     constructor(options: ConstructorArgsType<TBody>) {
@@ -44,9 +47,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 reqParams: {
                     ...this.reqParams
                 },
-                headers: {
-                    ...this.headers
-                },
+                headers: { ...this.headers } as Headers,
                 success: (res: any) => {
                     commonConsole(res, 'info', '请求success完成');
                     queue.end();
@@ -56,8 +57,9 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                     queue.end();
                 }
             })
+            this.requestInstance = r;
 
-            r?.onChunkReceived((chunk: any) => {
+            r?.onChunkReceived((chunk: { data: ArrayBuffer | string }) => {
                 const parsed = encodeBufferToJson(chunk?.data);
                 queue.push(parsed);
                 
@@ -65,10 +67,9 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 this.body?.push(parsed);
             });
 
-            r?.onHeadersReceived((chunk: Record<string, string>) => {
+            r?.onHeadersReceived((chunk: Headers) => {
                 this.onHeadersReceived?.(chunk)
             });
-
 
             while (true) {
                 commonConsole('开始等待下一个数据', 'info');
@@ -89,10 +90,12 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
      *
      * @returns 当前事件ID
      */
-    public getCurentEventId() {
+    public getCurrentEventId() {
         return this.eventId;
     };
 
 
-    public close() {};
+    public close() {
+        this.requestInstance?.abort();
+    };
 }

@@ -1,8 +1,6 @@
-import { Controller, Post, Res, Body, Header } from '@nestjs/common';
 import { Response } from 'express';
 import { Readable } from 'stream';
-import { createReadStream } from 'fs';
-import { join } from 'path';
+import { Controller, Post, Res, Body, Header } from '@nestjs/common';
 
 @Controller('stream')
 export class StreamController {
@@ -54,61 +52,6 @@ export class StreamController {
         clearInterval(interval);
       }
     }, intervalTime);
-
-    stream.pipe(res);
-  }
-
-  /**
-   * 其他接口（如之前的 file 和 custom）可以保留或根据需要修改
-   */
-
-  @Post('file')
-  @Header('Content-Type', 'text/plain')
-  getFileStream(@Res() res: Response, @Body() body: { filename?: string }) {
-    const filename = body.filename || 'sample.txt';
-    const filePath = join(__dirname, '..', 'files', filename);
-
-    const fileStream = createReadStream(filePath);
-
-    fileStream.on('open', () => {
-      fileStream.pipe(res);
-    });
-
-    fileStream.on('error', () => {
-      res.status(404).send('File not found');
-    });
-  }
-
-  @Post('custom')
-  getCustomStream(@Res() res: Response, @Body() body: { messages?: string[] }) {
-    res.set({
-      'Content-Type': 'text/plain',
-      'Transfer-Encoding': 'chunked',
-    });
-
-    const stream = new Readable({
-      read() {},
-    });
-
-    const messages = body.messages || [
-      'Hello',
-      'this',
-      'is',
-      'a',
-      'streaming',
-      'response.',
-    ];
-    let index = 0;
-
-    const interval = setInterval(() => {
-      if (index < messages.length) {
-        stream.push(messages[index] + ' ');
-        index++;
-      } else {
-        stream.push(null);
-        clearInterval(interval);
-      }
-    }, 1000);
 
     stream.pipe(res);
   }

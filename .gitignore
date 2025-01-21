@@ -46,3 +46,4 @@ kernel
 !packages/kernel
 
 /packages/*/lib
+/packages/*/dist
