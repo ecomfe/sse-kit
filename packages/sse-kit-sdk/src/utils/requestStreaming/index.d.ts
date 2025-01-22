@@ -11,7 +11,7 @@ export type HeadersReceivedCallbackType = (v: Headers) => void;
 export type ChunkReceivedCallbackType = (v: {data: ArrayBuffer | string}) => void;
 
 export interface RequestStreamingInstance {
-    onChunkReceived: (fn: ChunkReceivedCall) => void;
+    onChunkReceived: (fn: ChunkReceivedCallbackType) => void;
     onHeadersReceived: (fn: HeadersReceivedCallbackType) => void;
     abort: () => void;
 }

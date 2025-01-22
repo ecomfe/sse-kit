@@ -1,3 +1,5 @@
+import { commonConsole } from "./commonConsole";
+
 /**
  * 将 ArrayBuffer 或字符串编码为 JSON 对象
  *
@@ -26,11 +28,12 @@ export const encodeBufferToJson = (value: ArrayBuffer | string) => {
       try {
         return JSON.parse(data)
       } catch(e) {
-        console.error('解码异常', data);
+        commonConsole(e, 'error', 'encodeBufferToJson 解码异常');
       }
     }
   } catch(e)  {
-    console.error('解码异常', e)
+    commonConsole(e, 'error', 'encodeBufferToJson 解码异常');
+
     return {};
   }
 };

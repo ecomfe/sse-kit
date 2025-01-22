@@ -1,5 +1,5 @@
 <h1 align="center">SSE-Kit</h1>
-<div align="center">支持 web & 小程序的 SSE SDK</div>
+<div align="center">支持 web & 小程序(微信、百度) SSE SDK</div>
 
 ## 快速开始
 ```
@@ -10,14 +10,11 @@ const sseInstance = new SSEProcessor({
     url: 'xxx',
     method: "POST",
     reqParams: {},
-    onConnect: () => {
-        // 请求连接；
+    onHeadersReceived: () => {
+        // 请求连接建立成功，收到 response header；
     },
     onComplete: () => {
         // 请求完成；
-    },
-    onReconnect: () => {
-        // 请求重新连接；
     },
     onError: () => {
         // 请求出错；

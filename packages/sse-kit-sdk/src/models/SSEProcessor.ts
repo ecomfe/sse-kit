@@ -15,11 +15,11 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
 
     private body: TBody[] = [];
     private eventId: number = 0;
-    private abortControllers: AbortController[] = [];
-    private onHeadersReceived?: ConstructorArgsType<TBody>['onHeadersReceived'];
-
     private requestInstance?: RequestStreamingInstance;
 
+    private onComplete?: () => void;
+    private onError?: (err: Error) => void;
+    private onHeadersReceived?: ConstructorArgsType<TBody>['onHeadersReceived'];
 
     constructor(options: ConstructorArgsType<TBody>) {
         commonConsole(options, 'info', 'SSEProcessor 实例化参数');
@@ -29,6 +29,8 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
         this.headers = options.headers || {};
         this.reqParams = options.reqParams || {};
 
+        options?.onError && (this.onError = options.onError);
+        options?.onComplete && (this.onComplete = options.onComplete);
         options?.onHeadersReceived && (this.onHeadersReceived = options.onHeadersReceived);
     }
 
@@ -49,16 +51,19 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 },
                 headers: { ...this.headers } as Headers,
                 success: (res: any) => {
-                    commonConsole(res, 'info', '请求success完成');
+                    commonConsole(res, 'info', '请求完成');
                     queue.end();
+                    this.onComplete?.();
                 },
                 fail: (err: any) => {
-                    console.error('请求fail:', err);
+                    commonConsole(err, 'error', '请求 fail');
                     queue.end();
+                    this.onError?.(err);
                 }
             })
             this.requestInstance = r;
 
+            // 监听数据接收
             r?.onChunkReceived((chunk: { data: ArrayBuffer | string }) => {
                 const parsed = encodeBufferToJson(chunk?.data);
                 queue.push(parsed);
@@ -67,10 +72,12 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 this.body?.push(parsed);
             });
 
+            // 监听 response headers 返回
             r?.onHeadersReceived((chunk: Headers) => {
                 this.onHeadersReceived?.(chunk)
             });
 
+            // 数据 chunk 持续抛出
             while (true) {
                 commonConsole('开始等待下一个数据', 'info');
 

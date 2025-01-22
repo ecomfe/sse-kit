@@ -64,6 +64,7 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
             success?.(response.headers);
         } catch (err) {
             fail?.(err);
+            throw err;
         }
     })();
 
