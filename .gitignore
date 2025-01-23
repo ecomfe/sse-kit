@@ -47,3 +47,7 @@ kernel
 
 /packages/*/lib
 /packages/*/dist
+
+# Turborepo
+.cache/
+.turbo

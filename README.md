@@ -2,8 +2,27 @@
 <div align="center">支持 web & 小程序(微信、百度) SSE SDK</div>
 
 ## 快速开始
+
+### 安装
 ```
-import { SSEProcessor } from '@ecomfe/sse-kit';
+$ pnpm install sse-kit
+```
+
+### 包目录
+```
+├─lib
+├── bundle.h5.cjs.js
+├── bundle.h5.esm.js
+├── bundle.swan.cjs.js
+├── bundle.swan.esm.js
+├── bundle.weapp.cjs.js
+└── bundle.weapp.esm.js
+```
+
+### 使用
+```
+// 按照当前平台引入 SDK；
+import { SSEProcessor } from 'sse-kit/lib/xxx';
 
 // 实例化 SSE 请求；
 const sseInstance = new SSEProcessor({
