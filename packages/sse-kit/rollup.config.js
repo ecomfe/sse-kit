@@ -1,4 +1,4 @@
-// import dts from "rollup-plugin-dts";
+import dts from "rollup-plugin-dts";
 import { babel } from '@rollup/plugin-babel';
 import { terser } from "rollup-plugin-terser";
 import commonjs from '@rollup/plugin-commonjs';
@@ -55,12 +55,11 @@ function generateConfig(platformItem) {
     ],
     plugins: [
       typescript({ emitDeclarationOnly: true }), // 只生成 .d.ts 文件
-      // dts(),
+      dts(),
     ],
   };
 
-  return [jsConfig];
-  // return [jsConfig, dtsConfig];
+  return [jsConfig, dtsConfig];
 }
 
 export default platform.flatMap(generateConfig);

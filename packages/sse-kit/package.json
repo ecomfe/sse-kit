@@ -1,6 +1,6 @@
 {
   "name": "sse-kit",
-  "version": "1.0.0",
+  "version": "1.0.0-beta.1",
   "description": "",
   "main": "index.js",
   "type": "module",
@@ -13,7 +13,7 @@
   "files": [
     "lib/"
   ],
-  "author": "",
+  "author": "Howie126313",
   "license": "ISC",
   "devDependencies": {
     "@rollup/plugin-babel": "^6.0.4",
