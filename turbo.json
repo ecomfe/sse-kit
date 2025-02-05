@@ -1,0 +1,55 @@
+{
+    "$schema": "https://turbo.build/schema.json",
+    "ui": "tui",
+    "tasks": {
+        "dev:sdk": {
+            "dependsOn": [
+                "sse-kit#dev"
+            ]
+        },
+        "build:sdk": {
+            "dependsOn": [
+                "sse-kit#build"
+            ]
+        },
+        "sse-kit#build": {
+            "dependsOn": []
+        },
+        "sse-kit#dev": {
+            "dependsOn": []
+        },
+        "sse-kit#debug": {
+            "dependsOn": []
+        },
+        "local-service#start:dev": {
+            "dependsOn": []
+        },
+        "local-service#debug": {
+            "dependsOn": []
+        },
+        "dev:server": {
+            "dependsOn": ["local-service#start:dev"]
+        },
+        "dev:weapp": {
+            "cache": false,
+            "dependsOn": [
+                "sse-kit#debug",
+                "local-service#debug"
+            ]
+        },
+        "dev:swan": {
+            "cache": false,
+            "dependsOn": [
+                "sse-kit#debug",
+                "local-service#debug"
+            ]
+        },
+        "dev:h5": {
+            "cache": false,
+            "dependsOn": [
+                "sse-kit#debug",
+                "local-service#debug"
+            ]
+        }
+    }
+}

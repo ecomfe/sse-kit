@@ -6,8 +6,9 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "rollup -c --watch",
-    "build": "rollup -c"
+    "dev": "rm -rf ./lib && rollup -c --watch",
+    "debug": "rm -rf ./lib && node ./scripts/start-dev.js",
+    "build": "rm -rf ./lib && rollup -c"
   },
   "files": [
     "lib/"

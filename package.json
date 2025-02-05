@@ -1,15 +1,20 @@
 {
-  "name": "sse-kit",
+  "name": "sse-kit-repo",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start:backend": "pnpm --filter local-service run start",
-    "start:frontend": "pnpm --filter taro-demo run dev",
-    "start": "node scripts/start.js"
+    "dev:sdk": "turbo run dev:sdk",
+    "build:sdk": "turbo run build",
+    "dev:server": "turbo run dev:server",
+    "dev:weapp": "turbo run dev:weapp",
+    "dev:swan": "turbo run dev:swan",
+    "dev:h5": "turbo run dev:h5",
+    "check-types": "tsc --noEmit"
   },
+  "packageManager": "pnpm@9.0.0",
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "turbo": "^2.3.3"
   },
   "keywords": [],
   "author": "",

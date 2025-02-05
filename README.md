@@ -51,11 +51,14 @@ for await (const chunk of sseInstance.message()) {
 ```
 $ pnpm install
 
-// 本地启动 Demo、 sdk 模块及本地测试的 SSE 服务；（默认 demo 项目为微信小程序）
-$ pnpm start 
+// 启动指定平台的 demo 项目，默认启动对应 server 服务，对 sdk 进行构建并 watch 改动；
+$ pnpm dev h5/weapp/swan 
 
-// 启动指定平台的 demo 项目
-$ pnpm start h5/weapp/swan 
+// 本地调试 
+$ pnpm run dev:sdk
+
+// 构建 sse-kit SDK
+$ pnpm run build:sdk
 
 ```
 
@@ -64,7 +67,7 @@ $ pnpm start h5/weapp/swan
 
 ```
 // 启动本地用于调试的后端服务；
-$ pnpm run start:backend
+$ pnpm run dev:server
 
 // 确认服务是否启动成功；
 $ curl -X POST http://localhost:3000/stream/numbers -H "Content-Type: application/json" -d '{}'
@@ -82,10 +85,10 @@ $ pnpm start:frontend
 ### sse-kit-sdk
 ```
 // 本地调试 
-$ pnpm run dev
+$ pnpm run dev:sdk
 
 // 构建产物
-$ pnpm run build
+$ pnpm run build:sdk
 ```
 #### 多端支持
 - 当前支持 web、小程序（微信/百度），在`config/const.ts`中配置；
