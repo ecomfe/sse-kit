@@ -52,7 +52,7 @@ for await (const chunk of sseInstance.message()) {
 $ pnpm install
 
 // 启动指定平台的 demo 项目，默认启动对应 server 服务，对 sdk 进行构建并 watch 改动；
-$ pnpm dev h5/weapp/swan 
+$ pnpm dev:h5/weapp/swan 
 
 // 本地调试 
 $ pnpm run dev:sdk
@@ -77,7 +77,7 @@ $ curl -X POST http://localhost:3000/stream/numbers -H "Content-Type: applicatio
 ### taro-demo
 > 用于本地调试的 Taro 项目
 ```
-$ pnpm start:frontend
+$ pnpm dev:h5/weapp/swan 
 ```
 - 构建结果在 `taro-demo/dist/*` 目录下，不同端会创建对应的子目录；
 - 本地调试时，需要配置 `local-service` 作为后端服务；

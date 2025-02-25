@@ -29,7 +29,7 @@ const declarationCopiesPlugin = {
     declarationFiles.forEach(file => {
       const filePath = path.join(distDir, file);
       fs.writeFileSync(filePath, content, 'utf8');
-      console.log(`生成声明文件: ${filePath}`);
+      console.info(`生成声明文件: ${filePath}`);
     });
   }
 };

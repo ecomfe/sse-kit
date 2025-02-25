@@ -1,6 +1,6 @@
 import { commonConsole } from "../commonConsole";
 
-import type { RequestStreamingArgs, RequestStreamingInstance } from './index.d';
+import type { RequestStreamingArgs, RequestStreamingInstance, ChunkReceivedCallbackType } from './index.d';
 
 export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => {
     try {
@@ -29,10 +29,25 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
                 commonConsole(err, 'error');
                 throw err;
             }
-          })
+        });
 
-          return r as RequestStreamingInstance;
-    } catch(e) {
+        const originFunction = r.onChunkReceived.bind(r);
+        r.onChunkReceived = (fn: ChunkReceivedCallbackType) => {
+            originFunction((chunk: { data: string }) => {
+                const lines = chunk?.data.split('\n');
+                
+                for (let i = 0; i < lines.length - 1; i++) {
+                    const line = lines[i].trim();
+                    if (line) {
+                        line.includes('data:') 
+                        && fn({ data: line.replace(/^data:/, '').trim() });
+                    }
+                }
+            })
+        }
+
+        return r as RequestStreamingInstance;
+    } catch (e) {
         commonConsole(e, 'error');
         throw e;
     }

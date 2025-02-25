@@ -52,20 +52,21 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 headers: { ...this.headers } as Headers,
                 success: (res: any) => {
                     commonConsole(res, 'info', '请求完成');
-                    queue.end();
                     this.onComplete?.();
                 },
                 fail: (err: any) => {
                     commonConsole(err, 'error', '请求 fail');
-                    queue.end();
+                    // queue.end();
                     this.onError?.(err);
                 }
             })
             this.requestInstance = r;
 
-            // 监听数据接收
+            // H5 和百度小程序 chunk 返回值为 string；
             r?.onChunkReceived((chunk: { data: ArrayBuffer | string }) => {
+                console.info('onChunkReceived------', chunk)
                 const parsed = encodeBufferToJson(chunk?.data);
+
                 queue.push(parsed);
                 
                 this.eventId += 1;

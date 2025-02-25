@@ -45,15 +45,16 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
                 const { done, value } = await reader.read();
                 if (done) break;
               
-                const chunkText = new TextDecoder().decode(value);
+                const chunkText = new TextDecoder().decode(value, { stream: true });
                 buffer += chunkText;
-              
+
                 const lines = buffer.split('\n');
                 for (let i = 0; i < lines.length - 1; i++) {
                   const line = lines[i].trim();
                   if (line) {
                     try {
-                      onChunkReceivedCallback({data: line});
+                      line.includes('data:') 
+                      && onChunkReceivedCallback({data: line.replace(/^data:/, '').trim()});
                     } catch (err) {
                       commonConsole(err, 'error', '解析该行出错');
                     }
