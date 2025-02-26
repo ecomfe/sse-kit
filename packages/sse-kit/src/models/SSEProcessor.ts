@@ -64,7 +64,6 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
 
             // H5 和百度小程序 chunk 返回值为 string；
             r?.onChunkReceived((chunk: { data: ArrayBuffer | string }) => {
-                console.info('onChunkReceived------', chunk)
                 const parsed = encodeBufferToJson(chunk?.data);
 
                 queue.push(parsed);
