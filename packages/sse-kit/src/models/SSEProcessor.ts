@@ -8,6 +8,8 @@ import type { ISSE, ConstructorArgsType } from './index.d';
 import type {RequestStreamingInstance} from '../utils/requestStreaming/index.d';
 
 export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
+    public id: symbol;
+
     private url: `https://${string}`;
     private method: 'POST' | 'GET';
     private reqParams?: Record<string, string>;
@@ -24,6 +26,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
     constructor(options: ConstructorArgsType<TBody>) {
         commonConsole(options, 'info', 'SSEProcessor 实例化参数');
 
+        this.id = Symbol();
         this.url = options.url;
         this.method = options.method;
         this.headers = options.headers || {};
