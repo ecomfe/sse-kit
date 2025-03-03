@@ -33,7 +33,7 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
             onHeadersReceivedCallback(response.headers);
 
             if (!response.body) {
-                success?.(null);
+                success?.({ data: '', type: 'end', res: response });
 
                 return;
             }
@@ -62,7 +62,8 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
                 }
                 buffer = lines[lines.length - 1];
               }
-            success?.(response.headers);
+
+            success?.({ data: '', type: 'end', res: response.headers });
         } catch (err) {
             fail?.(err);
             throw err;

@@ -45,6 +45,9 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
     public async *message(): AsyncIterableIterator<TBody> {
         try {
             const queue = createAsyncQueue<any>();
+            
+            let pendingCount = 0;
+            let requestCompleted = false;
 
             const r = request({
                 url: this.url,
@@ -54,13 +57,28 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 },
                 headers: { ...this.headers } as Headers,
                 success: (res: any) => {
-                    commonConsole(res, 'info', '请求完成');
-                    this.onComplete?.();
+                    // 小程序场景会出现最后一个包存在数据；
+                    if (res.type === 'chunk') {
+                        const parsed = encodeBufferToJson(res?.data);
+                        queue.push(parsed);
+                    
+                        this.eventId += 1;
+                        this.body?.push(parsed);
+                        pendingCount++;
+                    } else {
+                        queue.end();
+                        requestCompleted = true;
+
+                        if (pendingCount === 0) {
+                            commonConsole('', 'info', '请求完成');
+                            this.onComplete?.();
+                        }
+                    }
                 },
                 fail: (err: any) => {
                     commonConsole(err, 'error', '请求 fail');
-                    // queue.end();
                     this.onError?.(err);
+                    queue.end();
                 }
             })
             this.requestInstance = r;
@@ -73,6 +91,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 
                 this.eventId += 1;
                 this.body?.push(parsed);
+                pendingCount++;
             });
 
             // 监听 response headers 返回
@@ -82,13 +101,19 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
 
             // 数据 chunk 持续抛出
             while (true) {
-                commonConsole('开始等待下一个数据', 'info');
-
                 const { value, done } = await queue.next();
                 if (done) {
                     return;
                 }
                 yield value;
+
+                pendingCount--;
+                if (requestCompleted && pendingCount === 0) {
+                    commonConsole('', 'info', '请求完成');
+                    this.onComplete?.();
+                } else {
+                    commonConsole('开始等待下一个数据', 'info');
+                }
             }
         } catch (error) {
             throw error;

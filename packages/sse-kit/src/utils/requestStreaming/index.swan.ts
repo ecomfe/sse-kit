@@ -21,8 +21,21 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
                 ...arg?.headers
             },
             success: (res: any) => {
-                arg?.success?.(res);
-                commonConsole(res, 'info', 'request success');
+                const lines = res?.data?.split('\n');
+
+                if (lines?.length > 1) {
+                    for (let i = 0; i <= lines.length - 1; i++) {
+                        const line = lines[i].trim();
+                        if (line && line.includes('data:') ) {
+                            arg?.success?.({ data: line.replace(/^data:/, '').trim(), type: 'chunk' });
+                        } 
+                        if (i === lines.length -1) {
+                            arg?.success?.({ data: '', type: 'end', res });
+                        }
+                    }
+                } else {
+                    arg?.success?.({ data: '', type: 'end', res });
+                }
             },
             fail: (err: any) => {
                 arg?.fail?.(err);

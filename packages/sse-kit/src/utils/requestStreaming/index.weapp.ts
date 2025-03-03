@@ -21,8 +21,31 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
                 ...arg?.headers
             },
             success: (res: any) => {
-                arg?.success?.(res);
-                commonConsole(res, 'info', 'request success');
+                let dataForSplit = '';
+                if (res?.data instanceof ArrayBuffer) {
+                    const v = new Uint8Array(res?.data)
+                    dataForSplit = decodeURIComponent(escape(String.fromCharCode(...v)));
+                };
+
+                const lines = dataForSplit.split('\n');
+
+                if (lines?.length > 1) {
+                    for (let i = 0; i <= lines.length - 1; i++) {
+                        const line = lines[i].trim();
+                        
+                        if (line) {
+                            line.includes('data:') 
+                            && arg?.success?.({ data: line.replace(/^data:/, '').trim(), type: 'chunk' });
+                        }
+                        if (i === lines.length -1) {
+                            arg?.success?.({ data: '', type: 'end', res });
+                            commonConsole(res, 'info', 'request success');
+                        }
+                    }
+                } else {
+                    arg?.success?.({ data: '', type: 'end', res });
+                    commonConsole(res, 'info', 'request success');
+                }
             },
             fail: (err: any) => {
                 arg?.fail?.(err);
