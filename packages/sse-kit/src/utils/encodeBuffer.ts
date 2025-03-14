@@ -21,14 +21,14 @@ export const encodeBufferToJson = (value: ArrayBuffer | string) => {
         return JSON.parse(v)
       } catch (error) {
         v = ''
-        console.error('解码异常', data);
+        console.error('非 string 类型解码异常', data);
         return JSON.parse(v)
       }
     } else {
       try {
         return JSON.parse(data)
       } catch(e) {
-        commonConsole(e, 'error', 'encodeBufferToJson 解码异常');
+        commonConsole(e, 'error', 'encodeBufferToJson string 类型解码异常');
       }
     }
   } catch(e)  {

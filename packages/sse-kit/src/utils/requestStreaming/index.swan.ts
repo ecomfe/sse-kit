@@ -1,6 +1,9 @@
 import { commonConsole } from "../commonConsole";
+import {processChunkData} from '../processChunkData';
+import {arrayBufferToString} from '../arrayBufferToString';
 
 import type { RequestStreamingArgs, RequestStreamingInstance, ChunkReceivedCallbackType } from './index.d';
+
 
 export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => {
     try {
@@ -9,11 +12,15 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
             commonConsole(err, 'error');
             throw err;
         }
-
+        let chunkBuffer = '';
+        let successBuffer = '';
+        
         const r = swan?.request({
             url: arg?.url,
             method: arg?.method,
             enableChunked: true,
+            timeout: arg.timeout || 60000,
+            responseType: 'arraybuffer',
             data: {
                 ...arg?.reqParams
             },
@@ -21,19 +28,21 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
                 ...arg?.headers
             },
             success: (res: any) => {
-                const lines = res?.data?.split('\n');
+                commonConsole(res, 'info', 'swan.request success');
 
-                if (lines?.length > 1) {
-                    for (let i = 0; i <= lines.length - 1; i++) {
-                        const line = lines[i].trim();
-                        if (line && line.includes('data:') ) {
-                            arg?.success?.({ data: line.replace(/^data:/, '').trim(), type: 'chunk' });
-                        } 
-                        if (i === lines.length -1) {
-                            arg?.success?.({ data: '', type: 'end', res });
-                        }
+                const dataForSplit = arrayBufferToString(res.data);
+                
+                const result = processChunkData(dataForSplit || '', successBuffer);
+                successBuffer = result.newBuffer;
+                result.messages.forEach(msg => {
+                    let processed = msg;
+                    if (processed.startsWith('data:')) {
+                        processed = processed.replace(/^data:/, '').trim();
                     }
-                } else {
+                    arg?.success?.({ data: processed, type: 'chunk' });
+                });
+
+                if (dataForSplit && dataForSplit.endsWith('\n')) {
                     arg?.success?.({ data: '', type: 'end', res });
                 }
             },
@@ -46,17 +55,29 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
 
         const originFunction = r.onChunkReceived.bind(r);
         r.onChunkReceived = (fn: ChunkReceivedCallbackType) => {
-            originFunction((chunk: { data: string }) => {
-                const lines = chunk?.data.split('\n');
-                
-                for (let i = 0; i < lines.length - 1; i++) {
-                    const line = lines[i].trim();
-                    if (line) {
-                        line.includes('data:') 
-                        && fn({ data: line.replace(/^data:/, '').trim() });
-                    }
+            originFunction((chunk: { data: ArrayBuffer }) => {
+                commonConsole(chunk, 'info', 'swan.request onChunkReceived');
+
+                let dataForSplit = '';
+                try {
+                    dataForSplit = arrayBufferToString(chunk.data);
+                } catch(err) {
+                    commonConsole(err, 'error', 'decodeURIComponent error');
                 }
-            })
+                commonConsole(dataForSplit, 'info', 'swan.request onChunkReceived arrayBufferToString');
+
+                const result = processChunkData(dataForSplit, chunkBuffer);
+                chunkBuffer = result.newBuffer;
+                result.messages.forEach(msg => {
+                    let processed = msg;
+                    if (processed.startsWith('data:')) {
+                        processed = processed.replace(/^data:/, '').trim();
+
+                        fn({ data: processed });
+                    }
+                    
+                });
+            });
         }
 
         return r as RequestStreamingInstance;

@@ -1,7 +1,8 @@
 export interface RequestStreamingArgs {
-    url: `https://${string}`;
+    url: `https://${string}` | `http://${string}`;
     method: 'POST' | 'GET';
     headers?: Headers;
+    timeout?: number;
     reqParams?: Record<string, string>;
     success?: (res: any) => void;
     fail?: (err: any) => void;

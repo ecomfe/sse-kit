@@ -1,8 +1,8 @@
 import { request } from '../utils/requestStreaming';
 
-import { commonConsole } from "../utils/commonConsole";
 import { encodeBufferToJson } from '../utils/encodeBuffer';
 import { createAsyncQueue } from '../utils/createAsyncQueue';
+import { commonConsole, updateEnableConsole } from "../utils/commonConsole";
 
 import type { ISSE, ConstructorArgsType } from './index.d';
 import type {RequestStreamingInstance} from '../utils/requestStreaming/index.d';
@@ -10,8 +10,9 @@ import type {RequestStreamingInstance} from '../utils/requestStreaming/index.d';
 export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
     public id: symbol;
 
-    private url: `https://${string}`;
+    private url: `https://${string}` | `http://${string}`;
     private method: 'POST' | 'GET';
+    private timeout: number = 60000;
     private reqParams?: Record<string, string>;
     private headers: Headers | Record<string, string>;
 
@@ -32,9 +33,14 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
         this.headers = options.headers || {};
         this.reqParams = options.reqParams || {};
 
+        options?.timeout && (this.timeout = options.timeout);
         options?.onError && (this.onError = options.onError);
         options?.onComplete && (this.onComplete = options.onComplete);
         options?.onHeadersReceived && (this.onHeadersReceived = options.onHeadersReceived);
+
+        if (options.enableConsole !== undefined) {
+            updateEnableConsole(options.enableConsole);
+        }
     }
 
     /**
@@ -55,9 +61,9 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 reqParams: {
                     ...this.reqParams
                 },
+                timeout: this.timeout,
                 headers: { ...this.headers } as Headers,
                 success: (res: any) => {
-                    // 小程序场景会出现最后一个包存在数据；
                     if (res.type === 'chunk') {
                         const parsed = encodeBufferToJson(res?.data);
                         queue.push(parsed);
@@ -83,8 +89,9 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
             })
             this.requestInstance = r;
 
-            // H5 和百度小程序 chunk 返回值为 string；
             r?.onChunkReceived((chunk: { data: ArrayBuffer | string }) => {
+                commonConsole(chunk?.data, 'info', 'SSEProcessor chunk 数据')
+
                 const parsed = encodeBufferToJson(chunk?.data);
 
                 queue.push(parsed);
@@ -94,12 +101,10 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 pendingCount++;
             });
 
-            // 监听 response headers 返回
             r?.onHeadersReceived((chunk: Headers) => {
                 this.onHeadersReceived?.(chunk)
             });
 
-            // 数据 chunk 持续抛出
             while (true) {
                 const { value, done } = await queue.next();
                 if (done) {

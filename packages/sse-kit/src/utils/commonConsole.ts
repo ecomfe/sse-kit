@@ -1,3 +1,9 @@
+let enableConsole = true;
+
+export const updateEnableConsole = (b: boolean) => {
+    enableConsole = b;
+};
+
 /**
  * 打印带有前缀的日志信息
  *
@@ -10,6 +16,8 @@ export const commonConsole = (
     type: 'warn' | 'error' | 'info',
     words?: string
 ) => {
+    if (!enableConsole) return;
+
     const prefix = `[sse-kit]${words ? ` ${words}` : ''}`;
 
     let style = 'background: #00c8c8; color: #fff; padding: 2px 4px; border-radius: 3px;';

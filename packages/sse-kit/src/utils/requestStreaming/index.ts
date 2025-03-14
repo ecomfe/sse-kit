@@ -49,7 +49,7 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
                 buffer += chunkText;
 
                 const lines = buffer.split('\n');
-                for (let i = 0; i < lines.length - 1; i++) {
+                for (let i = 0; i <= lines.length - 1; i++) {
                   const line = lines[i].trim();
                   if (line) {
                     try {
