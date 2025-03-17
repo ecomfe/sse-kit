@@ -4,6 +4,7 @@ export interface RequestStreamingArgs {
     headers?: Headers;
     timeout?: number;
     reqParams?: Record<string, string>;
+    preprocessDataCallback?: (data: any) => any;
     success?: (res: any) => void;
     fail?: (err: any) => void;
 }

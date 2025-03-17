@@ -22,6 +22,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
 
     private onComplete?: () => void;
     private onError?: (err: Error) => void;
+    private preprocessDataCallback?: (data: string | ArrayBuffer) => string | ArrayBuffer;
     private onHeadersReceived?: ConstructorArgsType<TBody>['onHeadersReceived'];
 
     constructor(options: ConstructorArgsType<TBody>) {
@@ -37,6 +38,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
         options?.onError && (this.onError = options.onError);
         options?.onComplete && (this.onComplete = options.onComplete);
         options?.onHeadersReceived && (this.onHeadersReceived = options.onHeadersReceived);
+        options?.preprocessDataCallback && (this.preprocessDataCallback = options.preprocessDataCallback);
 
         if (options.enableConsole !== undefined) {
             updateEnableConsole(options.enableConsole);
@@ -52,9 +54,6 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
         try {
             const queue = createAsyncQueue<any>();
             
-            let pendingCount = 0;
-            let requestCompleted = false;
-
             const r = request({
                 url: this.url,
                 method: this.method,
@@ -63,23 +62,10 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 },
                 timeout: this.timeout,
                 headers: { ...this.headers } as Headers,
+                preprocessDataCallback: this.preprocessDataCallback,
                 success: (res: any) => {
-                    if (res.type === 'chunk') {
-                        const parsed = encodeBufferToJson(res?.data);
-                        queue.push(parsed);
-                    
-                        this.eventId += 1;
-                        this.body?.push(parsed);
-                        pendingCount++;
-                    } else {
-                        queue.end();
-                        requestCompleted = true;
-
-                        if (pendingCount === 0) {
-                            commonConsole('', 'info', '请求完成');
-                            this.onComplete?.();
-                        }
-                    }
+                    commonConsole(res, 'info', '请求完成');
+                    this.onComplete?.();
                 },
                 fail: (err: any) => {
                     commonConsole(err, 'error', '请求 fail');
@@ -98,7 +84,6 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 
                 this.eventId += 1;
                 this.body?.push(parsed);
-                pendingCount++;
             });
 
             r?.onHeadersReceived((chunk: Headers) => {
@@ -111,14 +96,6 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                     return;
                 }
                 yield value;
-
-                pendingCount--;
-                if (requestCompleted && pendingCount === 0) {
-                    commonConsole('', 'info', '请求完成');
-                    this.onComplete?.();
-                } else {
-                    commonConsole('开始等待下一个数据', 'info');
-                }
             }
         } catch (error) {
             throw error;

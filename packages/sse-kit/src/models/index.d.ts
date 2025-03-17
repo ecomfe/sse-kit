@@ -16,5 +16,6 @@ export interface ConstructorArgsType<TBody extends object> {
     onComplete?: () => void;
     onReconnect?: () => void;
     onError?: (err: Error) => void;
+    preprocessDataCallback?: (data: any) => any;
     onHeadersReceived?: (headers: Headers) => void;
 }

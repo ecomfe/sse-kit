@@ -12,7 +12,6 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
             throw err;
         }
         let chunkBuffer = '';
-        let successBuffer = '';
 
         const r = wx?.request({
             url: arg?.url,
@@ -26,29 +25,8 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
                 ...arg?.headers
             },
             success: (res: any) => {
-                commonConsole(res, 'info', 'wx.request success');
-
-                let dataForSplit = '';
-                if (res?.data instanceof ArrayBuffer) {
-                    const v = new Uint8Array(res?.data);
-                    dataForSplit = decodeURIComponent(escape(String.fromCharCode(...v)));
-                } else {
-                    dataForSplit = res?.data || '';
-                }
-
-                // 使用公共方法处理数据
-                const result = processChunkData(dataForSplit, successBuffer);
-                successBuffer = result.newBuffer;
-                result.messages.forEach(msg => {
-                    if (msg.startsWith('data:')) {
-                        const processed = msg.replace(/^data:/, '').trim();
-                        arg?.success?.({ data: processed, type: 'chunk' });
-                    }
-                });
-                // 如果返回数据以换行符结束，则认为数据完整，发送结束标识
-                if (dataForSplit.endsWith('\n')) {
-                    arg?.success?.({ data: '', type: 'end', res });
-                }
+                arg?.success?.(res);
+                commonConsole(res, 'info', 'swan.request success');
             },
             fail: (err: any) => {
                 arg?.fail?.(err);
@@ -78,7 +56,11 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
                 chunkBuffer = result.newBuffer;
                 result.messages.forEach(msg => {
                     if (msg.startsWith('data:')) {
-                        const processed = msg.replace(/^data:/, '').trim();
+                        const processedData = arg?.preprocessDataCallback 
+                            ? arg?.preprocessDataCallback?.(msg) 
+                            : msg;
+
+                        const processed = processedData.replace(/^data:/, '').trim();
                         fn({ data: processed });
                     }
                 });

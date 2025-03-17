@@ -33,9 +33,11 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
             onHeadersReceivedCallback(response.headers);
 
             if (!response.body) {
-                success?.({ data: '', type: 'end', res: response });
-
-                return;
+                if (!response.body) {
+                    success?.(null);
+    
+                    return;
+                }
             }
 
             const reader = response.body.getReader();
@@ -49,7 +51,7 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
                 buffer += chunkText;
 
                 const lines = buffer.split('\n');
-                for (let i = 0; i <= lines.length - 1; i++) {
+                for (let i = 0; i < lines.length - 1; i++) {
                   const line = lines[i].trim();
                   if (line) {
                     try {
@@ -63,7 +65,7 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
                 buffer = lines[lines.length - 1];
               }
 
-            success?.({ data: '', type: 'end', res: response.headers });
+              success?.(response.headers);
         } catch (err) {
             fail?.(err);
             throw err;

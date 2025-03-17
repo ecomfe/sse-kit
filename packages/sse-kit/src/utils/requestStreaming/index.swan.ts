@@ -1,6 +1,4 @@
 import { commonConsole } from "../commonConsole";
-import {processChunkData} from '../processChunkData';
-import {arrayBufferToString} from '../arrayBufferToString';
 
 import type { RequestStreamingArgs, RequestStreamingInstance, ChunkReceivedCallbackType } from './index.d';
 
@@ -13,14 +11,13 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
             throw err;
         }
         let chunkBuffer = '';
-        let successBuffer = '';
         
         const r = swan?.request({
             url: arg?.url,
             method: arg?.method,
             enableChunked: true,
             timeout: arg.timeout || 60000,
-            responseType: 'arraybuffer',
+            responseType: 'text',
             data: {
                 ...arg?.reqParams
             },
@@ -28,23 +25,8 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
                 ...arg?.headers
             },
             success: (res: any) => {
+                arg?.success?.(res);
                 commonConsole(res, 'info', 'swan.request success');
-
-                const dataForSplit = arrayBufferToString(res.data);
-                
-                const result = processChunkData(dataForSplit || '', successBuffer);
-                successBuffer = result.newBuffer;
-                result.messages.forEach(msg => {
-                    let processed = msg;
-                    if (processed.startsWith('data:')) {
-                        processed = processed.replace(/^data:/, '').trim();
-                    }
-                    arg?.success?.({ data: processed, type: 'chunk' });
-                });
-
-                if (dataForSplit && dataForSplit.endsWith('\n')) {
-                    arg?.success?.({ data: '', type: 'end', res });
-                }
             },
             fail: (err: any) => {
                 arg?.fail?.(err);
@@ -55,30 +37,29 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
 
         const originFunction = r.onChunkReceived.bind(r);
         r.onChunkReceived = (fn: ChunkReceivedCallbackType) => {
-            originFunction((chunk: { data: ArrayBuffer }) => {
-                commonConsole(chunk, 'info', 'swan.request onChunkReceived');
+            originFunction((chunk: { data: string }) => {
+                let dataStr: string = chunk.data;
 
-                let dataForSplit = '';
-                try {
-                    dataForSplit = arrayBufferToString(chunk.data);
-                } catch(err) {
-                    commonConsole(err, 'error', 'decodeURIComponent error');
-                }
-                commonConsole(dataForSplit, 'info', 'swan.request onChunkReceived arrayBufferToString');
-
-                const result = processChunkData(dataForSplit, chunkBuffer);
-                chunkBuffer = result.newBuffer;
-                result.messages.forEach(msg => {
-                    let processed = msg;
-                    if (processed.startsWith('data:')) {
-                        processed = processed.replace(/^data:/, '').trim();
-
-                        fn({ data: processed });
+                chunkBuffer += dataStr;
+                const lines = chunkBuffer.split('\n');
+        
+                for (let i = 0; i < lines.length - 1; i++) {
+                    const line = lines[i].trim();
+                    if (line) {
+                        try {
+                            if (line.includes('data:')) {
+                                const processedLine = arg?.preprocessDataCallback ? arg?.preprocessDataCallback?.(line) : line;
+                                
+                                fn({ data: processedLine.replace(/^data:/, '').trim() });
+                            }
+                        } catch (err) {
+                            commonConsole(err, 'error', '解析该行出错');
+                        }
                     }
-                    
-                });
+                }
+                chunkBuffer = lines[lines.length - 1];
             });
-        }
+        };
 
         return r as RequestStreamingInstance;
     } catch (e) {
