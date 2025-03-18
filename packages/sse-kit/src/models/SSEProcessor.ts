@@ -53,7 +53,9 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
     public async *message(): AsyncIterableIterator<TBody> {
         try {
             const queue = createAsyncQueue<any>();
-            
+            let successCalled = false;
+            let successResponse: any;
+
             const r = request({
                 url: this.url,
                 method: this.method,
@@ -64,8 +66,9 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 headers: { ...this.headers } as Headers,
                 preprocessDataCallback: this.preprocessDataCallback,
                 success: (res: any) => {
-                    commonConsole(res, 'info', '请求完成');
-                    this.onComplete?.();
+                    successResponse = res;
+                    successCalled = true;
+                    queue.end();
                 },
                 fail: (err: any) => {
                     commonConsole(err, 'error', '请求 fail');
@@ -93,9 +96,14 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
             while (true) {
                 const { value, done } = await queue.next();
                 if (done) {
-                    return;
+                    break;
                 }
                 yield value;
+            }
+
+            if (successCalled) {
+                commonConsole(successResponse, 'info', '请求完成');
+                this.onComplete?.();
             }
         } catch (error) {
             throw error;
