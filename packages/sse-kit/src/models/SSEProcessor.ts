@@ -45,11 +45,6 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
         }
     }
 
-    /**
-     * 异步获取消息
-     *
-     * @returns 返回一个异步可迭代对象，包含消息体
-     */
     public async *message(): AsyncIterableIterator<TBody> {
         try {
             const queue = createAsyncQueue<any>();
@@ -81,12 +76,15 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
             r?.onChunkReceived((chunk: { data: ArrayBuffer | string }) => {
                 commonConsole(chunk?.data, 'info', 'SSEProcessor chunk 数据')
 
-                const parsed = encodeBufferToJson(chunk?.data);
-
-                queue.push(parsed);
+                const parsed = encodeBufferToJson<TBody>(chunk?.data);
                 
-                this.eventId += 1;
-                this.body?.push(parsed);
+                if (parsed !== undefined) {
+                    queue.push(parsed);
+                    this.eventId += 1;
+                    this.body?.push(parsed as TBody);
+                } else {
+                    commonConsole('数据解析失败，跳过该条数据', 'warn');
+                }
             });
 
             r?.onHeadersReceived((chunk: Headers) => {
@@ -98,7 +96,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 if (done) {
                     break;
                 }
-                yield value;
+                yield value as TBody;
             }
 
             if (successCalled) {
@@ -110,11 +108,6 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
         }
     };
 
-    /**
-     * 获取当前事件ID
-     *
-     * @returns 当前事件ID
-     */
     public getCurrentEventId() {
         return this.eventId;
     };
