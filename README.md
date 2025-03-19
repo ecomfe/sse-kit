@@ -84,9 +84,8 @@ const processor = new SSEProcessor<UserMessage>({
     console.error('请求错误:', err);
   },
   
-  // 数据预处理
+  // 在json 序列号之前，数据预处理
   preprocessDataCallback: (data: string | ArrayBuffer) => {
-    // 在解析 JSON 之前对数据进行预处理
     return data;
   }
 });
@@ -148,7 +147,7 @@ interface ConstructorArgsType<TBody extends object> {
 1. 泛型参数 `TBody` 必须是一个对象类型
 2. 如果数据解析失败，对应的数据块会被跳过，并在控制台输出警告
 3. 请求超时默认为 60 秒
-4. 在小程序环境中使用时，需要在开发者工具中开启 "开启 UDP 能力"
+4. 百度小程序中，会偶现 utf-8 中文乱码问题。建议下发数据为 base64，通过 `preprocessDataCallback` 函数对 base64 数据转换处理为 `string` 类型返回；
 
 ## 调试
 
