@@ -1,3 +1,5 @@
+import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source';
+
 import { commonConsole } from "../commonConsole";
 import type { RequestStreamingArgs, RequestStreamingInstance, ChunkReceivedCallbackType, HeadersReceivedCallbackType } from './index.d';
 
@@ -9,13 +11,13 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
         headers = {},
         success,
         fail,
-        timeout = 60000, // 默认超时时间为 60 秒
+        timeout = 60000,
     } = options;
 
     const controller = new AbortController();
     let onChunkReceivedCallback: ChunkReceivedCallbackType = () => { };
     let onHeadersReceivedCallback: HeadersReceivedCallbackType = () => { };
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: number;
 
     const cleanup = () => {
         if (timeoutId) {
@@ -23,16 +25,18 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
         }
     };
 
+    timeoutId = setTimeout(() => {
+        controller.abort();
+        cleanup();
+        const timeoutError = new Error(`Request timeout after ${timeout}ms`);
+        fail?.(timeoutError);
+    }, timeout);
+
     (async () => {
         try {
-            timeoutId = setTimeout(() => {
-                controller.abort();
-                cleanup();
-                const timeoutError = new Error(`Request timeout after ${timeout}ms`);
-                fail?.(timeoutError);
-            }, timeout);
-
-            const response = await fetch(url, {
+            console.error('切换至 @microsoft/fetch-event-source', 'info')
+            
+            await fetchEventSource(url, {
                 method,
                 headers: {
                     'Content-Type': 'application/json',
@@ -40,47 +44,31 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
                 },
                 body: reqParams ? JSON.stringify(reqParams) : undefined,
                 signal: controller.signal,
-            });
-
-            if (!response.ok) {
-                cleanup();
-                throw new Error(`HTTP status code: ${response.status}`);
-            }
-            onHeadersReceivedCallback(response.headers);
-
-            if (!response.body) {
-                cleanup();
-                success?.(null);
-                return;
-            }
-
-            const reader = response.body.getReader();
-
-            let buffer = '';
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-              
-                const chunkText = new TextDecoder().decode(value, { stream: true });
-                buffer += chunkText;
-
-                const lines = buffer.split('\n');
-                for (let i = 0; i < lines.length - 1; i++) {
-                  const line = lines[i].trim();
-                  if (line) {
-                    try {
-                      line.includes('data:') 
-                      && onChunkReceivedCallback({data: line.replace(/^data:/, '').trim()});
-                    } catch (err) {
-                      commonConsole(err, 'error', '解析该行出错');
+                async onopen(response: Response) {
+                    if (!response.ok) {
+                        throw new Error(`HTTP status code: ${response.status}`);
                     }
-                  }
-                }
-                buffer = lines[lines.length - 1];
-            }
-
-            cleanup();
-            success?.(response.headers);
+                    onHeadersReceivedCallback(response.headers);
+                },
+                onmessage(event: EventSourceMessage) {
+                    try {
+                        if (event.data) {
+                            onChunkReceivedCallback({ data: event.data });
+                        }
+                    } catch (err) {
+                        commonConsole(err, 'error', '解析该行出错');
+                    }
+                },
+                onclose() {
+                    cleanup();
+                    success?.(null);
+                },
+                onerror(err: Error) {
+                    cleanup();
+                    fail?.(err);
+                    throw err;
+                },
+            });
         } catch (err) {
             cleanup();
             fail?.(err);
@@ -100,4 +88,4 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
             controller.abort();
         },
     };
-}
+} 

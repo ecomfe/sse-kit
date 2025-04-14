@@ -64,7 +64,11 @@ function generateJsConfig(platformItem) {
           })
         ],
       }),
-      commonjs(),
+      commonjs({
+        transformMixedEsModules: true,
+        requireReturnsDefault: 'auto',
+        context: 'this'
+      }),
     ]
   };
 }
