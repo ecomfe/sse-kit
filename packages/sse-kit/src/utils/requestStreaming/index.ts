@@ -9,14 +9,29 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
         headers = {},
         success,
         fail,
+        timeout = 60000, // 默认超时时间为 60 秒
     } = options;
 
     const controller = new AbortController();
     let onChunkReceivedCallback: ChunkReceivedCallbackType = () => { };
     let onHeadersReceivedCallback: HeadersReceivedCallbackType = () => { };
+    let timeoutId: NodeJS.Timeout;
+
+    const cleanup = () => {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+    };
 
     (async () => {
         try {
+            timeoutId = setTimeout(() => {
+                controller.abort();
+                cleanup();
+                const timeoutError = new Error(`Request timeout after ${timeout}ms`);
+                fail?.(timeoutError);
+            }, timeout);
+
             const response = await fetch(url, {
                 method,
                 headers: {
@@ -28,16 +43,15 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
             });
 
             if (!response.ok) {
+                cleanup();
                 throw new Error(`HTTP status code: ${response.status}`);
             }
             onHeadersReceivedCallback(response.headers);
 
             if (!response.body) {
-                if (!response.body) {
-                    success?.(null);
-    
-                    return;
-                }
+                cleanup();
+                success?.(null);
+                return;
             }
 
             const reader = response.body.getReader();
@@ -63,10 +77,12 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
                   }
                 }
                 buffer = lines[lines.length - 1];
-              }
+            }
 
-              success?.(response.headers);
+            cleanup();
+            success?.(response.headers);
         } catch (err) {
+            cleanup();
             fail?.(err);
             throw err;
         }
@@ -80,6 +96,7 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
             onHeadersReceivedCallback = fn;
         },
         abort() {
+            cleanup();
             controller.abort();
         },
     };
