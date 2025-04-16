@@ -42,6 +42,7 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
                     'Content-Type': 'application/json',
                     ...headers,
                 },
+                openWhenHidden: true,
                 body: reqParams ? JSON.stringify(reqParams) : undefined,
                 signal: controller.signal,
                 async onopen(response: Response) {
