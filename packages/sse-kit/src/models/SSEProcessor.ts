@@ -104,6 +104,10 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 this.onComplete?.();
             }
         } catch (error) {
+            if ((error as Error).name === 'AbortError') {
+                console.warn('SSEProcessor message aborted: 忽略 AbortError');
+                return;
+            }
             throw error;
         }
     };
@@ -114,6 +118,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
 
 
     public close() {
+        console.warn('SSEProcessor close 调用啊啊啊啊啊啊')
         this.requestInstance?.abort();
     };
 }
