@@ -15,7 +15,7 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
     const controller = new AbortController();
     let onChunkReceivedCallback: ChunkReceivedCallbackType = () => { };
     let onHeadersReceivedCallback: HeadersReceivedCallbackType = () => { };
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: number | undefined;
 
     const cleanup = () => {
         if (timeoutId) {
