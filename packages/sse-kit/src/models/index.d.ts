@@ -13,7 +13,7 @@ export interface ConstructorArgsType<TBody extends object> {
     enableConsole?: boolean;
     timeout?: number;
     onConnect?: () => void;
-    onComplete?: () => void;
+    onComplete?: (response: unknown) => void;
     onReconnect?: () => void;
     onError?: (err: Error) => void;
     preprocessDataCallback?: (data: any) => any;
