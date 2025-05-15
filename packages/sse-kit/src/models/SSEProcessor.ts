@@ -20,8 +20,8 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
     private eventId: number = 0;
     private requestInstance?: RequestStreamingInstance;
 
-    private onComplete?: () => void;
     private onError?: (err: Error) => void;
+    private onComplete?: (response: unknown) => void;
     private preprocessDataCallback?: (data: string | ArrayBuffer) => string | ArrayBuffer;
     private onHeadersReceived?: ConstructorArgsType<TBody>['onHeadersReceived'];
 
@@ -101,7 +101,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
 
             if (successCalled) {
                 commonConsole(successResponse, 'info', '请求完成');
-                this.onComplete?.();
+                this.onComplete?.(successResponse);
             }
         } catch (error) {
             throw error;
