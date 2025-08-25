@@ -1,7 +1,10 @@
 import { commonConsole } from "../commonConsole";
+import { RequestState, validateRequestOptions, createErrorHandler, createSuccessHandler, processSseLine, buildRequestHeaders } from './common';
 import type { RequestStreamingArgs, RequestStreamingInstance, ChunkReceivedCallbackType, HeadersReceivedCallbackType } from './index.d';
 
 export function request(options: RequestStreamingArgs): RequestStreamingInstance {
+    validateRequestOptions(options);
+    
     const {
         url,
         method,
@@ -9,62 +12,44 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
         headers = {},
         success,
         fail,
-        timeout = 60000, // 默认超时时间为 60 秒
+        credentials,
+        timeout = 60000,
     } = options;
 
     const controller = new AbortController();
+    const state = new RequestState();
+    const handleError = createErrorHandler(fail, state);
+    const handleSuccess = createSuccessHandler(success, state);
+    
     let onChunkReceivedCallback: ChunkReceivedCallbackType = () => { };
     let onHeadersReceivedCallback: HeadersReceivedCallbackType = () => { };
     let timeoutId: number | undefined;
-    let isUserAborted = false;
-    let isCompleted = false;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
     const cleanup = () => {
         if (timeoutId) {
             clearTimeout(timeoutId);
             timeoutId = undefined;
         }
-    };
-
-    const handleError = (err: Error) => {
-        if (isCompleted) return; // 防止重复处理
-        isCompleted = true;
-        
-        cleanup();
-        if (isUserAborted || err.name === 'AbortError') {
-            fail?.({
-                status: 'aborted',
-                message: '用户主动取消请求',
-                error: err
-            });
-        } else {
-            fail?.({
-                error: err,
-                status: 'error',
-                message: err.message || '请求失败'
-            });
+        // Clean up Reader resources
+        if (reader) {
+            try {
+                reader.cancel('Stream cleanup');
+            } catch (err) {
+                commonConsole(err, 'warn', 'Reader cancel failed');
+            }
+            reader = null;
         }
     };
 
-    const handleSuccess = (response: Response | null) => {
-        if (isCompleted) return;
-        isCompleted = true;
-        
-        cleanup();
-        success?.({
-            status: 'success',
-            message: response ? '请求成功完成' : '请求成功，但响应体为空',
-            headers: response ? response.headers : null
-        });
-    };
-
-    const processStream = (reader: ReadableStreamDefaultReader<Uint8Array>, response: Response) => {
+    const processStream = (streamReader: ReadableStreamDefaultReader<Uint8Array>, response: Response) => {
+        reader = streamReader; // Save reader reference for cleanup
         let buffer = '';
         const decoder = new TextDecoder();
 
         function readChunk(): Promise<void> {
-            return reader.read().then(({ done, value }) => {
-                if (isCompleted) return; // 如果在读取过程中被中止
+            return streamReader.read().then(({ done, value }) => {
+                if (state.isCompleted) return;
 
                 if (done) {
                     handleSuccess(response);
@@ -79,23 +64,20 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
                     const line = lines[i].trim();
                     if (line) {
                         try {
-                            line.includes('data:') 
-                            && onChunkReceivedCallback({data: line.replace(/^data:/, '').trim()});
+                            processSseLine(line, onChunkReceivedCallback);
                         } catch (err) {
-                            commonConsole(err, 'error', '解析该行出错');
+                            handleError(err as Error);
+                            return;
                         }
                     }
                 }
                 buffer = lines[lines.length - 1];
 
-                // 继续读取下一个块
                 return readChunk();
             }).catch(error => {
-                // 处理 reader.read() 的错误
-                if (!isCompleted) {
-                    // 如果流读取被中止，也算作 AbortError
-                     if ((error as Error).name === 'AbortError') {
-                         handleError(new Error('Stream reading aborted by user or timeout'));
+                if (!state.isCompleted) {
+                    if ((error as Error).name === 'AbortError') {
+                        handleError(new Error('Stream reading aborted by user or timeout'), 'aborted');
                     } else {
                         handleError(error as Error);
                     }
@@ -107,35 +89,38 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
     };
 
     try {
+        if (state.isStarted) {
+            throw new Error('Request already started');
+        }
+        state.markStarted();
+        
         timeoutId = setTimeout(() => {
             controller.abort();
             cleanup();
-
             const timeoutError = new Error(`Request timeout after ${timeout}ms`);
-            fail?.({
-                error: timeoutError,
-                status: 'timeout',
-                message: `请求超时（${timeout}ms）`
-            });
+            handleError(timeoutError, 'timeout');
         }, timeout);
+
+        const requestHeaders = buildRequestHeaders(headers, !!reqParams);
 
         fetch(url, {
             method,
-            headers: {
-                'Content-Type': 'application/json',
-                ...headers,
-            },
-            body: reqParams ? JSON.stringify(reqParams) : undefined,
+            mode: 'cors',
+            cache: 'no-cache',
+            redirect: 'manual',
+            headers: requestHeaders,
             signal: controller.signal,
+            body: reqParams ? JSON.stringify(reqParams) : undefined,
+            ...(credentials ? { credentials } : {})
         })
         .then(response => {
             if (!response.ok) {
-                 // 处理 HTTP 错误状态码
-                 return response.text().then(errorBody => {
+                // Handle HTTP error status codes
+                return response.text().then(errorBody => {
                     throw new Error(`HTTP status code: ${response.status}. Body: ${errorBody}`);
-                 }).catch(() => {
-                     throw new Error(`HTTP status code: ${response.status}. Failed to read error body.`);
-                 });
+                }).catch(() => {
+                    throw new Error(`HTTP status code: ${response.status}. Failed to read error body.`);
+                });
             }
 
             onHeadersReceivedCallback(response.headers);
@@ -147,7 +132,6 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
             
             processStream(response.body.getReader(), response);
             return Promise.resolve();
-
         })
         .catch(err => {
             handleError(err);
@@ -166,13 +150,14 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
         },
         abort() {
             try {
-                if (!isCompleted) {
-                    isUserAborted = true;
-                    controller.abort(); // 这会触发 fetch 或 reader.read() 的 AbortError
+                if (!state.isCompleted) {
+                    state.markAborted();
+                    controller.abort();
                     cleanup();
                 }
             } catch(err) {
-                commonConsole(err, 'error', '取消请求失败');
+                commonConsole(err, 'error', 'Request cancellation failed');
+                handleError(err as Error);
             }
         },
     };

@@ -55,7 +55,7 @@ export const multiPlatformBuild = function ({ platformSignal }) {
                         }
                     });
                 } catch (err) {
-                    console.error('multiPlatformBuild plugin 出错：', err);
+                    console.error('multiPlatformBuild plugin error:', err);
                 }
             }
         }

@@ -5,11 +5,11 @@ export const updateEnableConsole = (b: boolean) => {
 };
 
 /**
- * 打印带有前缀的日志信息
+ * Print log messages with prefix
  *
- * @param msg 要打印的消息内容
- * @param type 日志类型，可选值为 'warn'、'error' 或 'info'
- * @param words 可选参数，用于指定前缀中的附加文本
+ * @param msg Message content to print
+ * @param type Log type, options are 'warn', 'error' or 'info'
+ * @param words Optional parameter for additional text in prefix
  */
 export const commonConsole = (
     msg: any,

@@ -20,13 +20,15 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
     private eventId: number = 0;
     private requestInstance?: RequestStreamingInstance;
 
+    private credentials?: 'include' | 'same-origin' | 'omit';
+
     private onError?: (err: Error) => void;
     private onComplete?: (response: unknown) => void;
-    private preprocessDataCallback?: (data: string | ArrayBuffer) => string | ArrayBuffer;
     private onHeadersReceived?: ConstructorArgsType<TBody>['onHeadersReceived'];
+    private preprocessDataCallback?: (data: string | ArrayBuffer) => string | ArrayBuffer;
 
     constructor(options: ConstructorArgsType<TBody>) {
-        commonConsole(options, 'info', 'SSEProcessor 实例化参数');
+        commonConsole(options, 'info', 'SSEProcessor initialization parameters');
 
         this.id = Symbol();
         this.url = options.url;
@@ -35,10 +37,13 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
         this.reqParams = options.reqParams || {};
 
         options?.timeout && (this.timeout = options.timeout);
+        options?.credentials && (this.credentials = options.credentials);
         options?.onError && (this.onError = options.onError);
         options?.onComplete && (this.onComplete = options.onComplete);
         options?.onHeadersReceived && (this.onHeadersReceived = options.onHeadersReceived);
         options?.preprocessDataCallback && (this.preprocessDataCallback = options.preprocessDataCallback);
+
+        console.info('SSEProcessor initialization parameters sse-kit@1.0.8-why.22', options);
 
         if (options.enableConsole !== undefined) {
             updateEnableConsole(options.enableConsole);
@@ -57,6 +62,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                 reqParams: {
                     ...this.reqParams
                 },
+                ...(this.credentials ? { credentials: this.credentials } : {}),
                 timeout: this.timeout,
                 headers: { ...this.headers } as Headers,
                 preprocessDataCallback: this.preprocessDataCallback,
@@ -66,7 +72,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                     queue.end();
                 },
                 fail: (err: any) => {
-                    commonConsole(err, 'error', '请求 fail');
+                    commonConsole(err, 'error', 'Request failed');
                     this.onError?.(err);
                     queue.end();
                 }
@@ -74,7 +80,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
             this.requestInstance = r;
 
             r?.onChunkReceived((chunk: { data: ArrayBuffer | string }) => {
-                commonConsole(chunk?.data, 'info', 'SSEProcessor chunk 数据')
+                commonConsole(chunk?.data, 'info', 'SSEProcessor chunk data')
 
                 const parsed = encodeBufferToJson<TBody>(chunk?.data);
                 
@@ -83,7 +89,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
                     this.eventId += 1;
                     this.body?.push(parsed as TBody);
                 } else {
-                    commonConsole('数据解析失败，跳过该条数据', 'warn');
+                    commonConsole('Data parsing failed, skipping this data', 'warn');
                 }
             });
 
@@ -100,7 +106,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
             }
 
             if (successCalled) {
-                commonConsole(successResponse, 'info', '请求完成');
+                commonConsole(successResponse, 'info', 'Request completed');
                 this.onComplete?.(successResponse);
             }
         } catch (error) {

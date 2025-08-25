@@ -1,17 +1,16 @@
 import { commonConsole } from "../commonConsole";
-
+import { RequestState, validateRequestOptions, createErrorHandler, createSuccessHandler, processSseLine } from './common';
 import type { RequestStreamingArgs, RequestStreamingInstance, ChunkReceivedCallbackType } from './index.d';
-
 
 export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => {
     try {
-        if (!(arg?.url || arg?.method)) {
-            const err = new Error('url or method is required');
-            commonConsole(err, 'error');
-            throw err;
-        }
-        let chunkBuffer = '';
+        validateRequestOptions(arg);
         
+        const state = new RequestState();
+        const handleError = createErrorHandler(arg.fail, state);
+        const handleSuccess = createSuccessHandler(arg.success, state);
+        let chunkBuffer = '';
+            
         const r = swan?.request({
             url: arg?.url,
             method: arg?.method,
@@ -25,13 +24,12 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
                 ...arg?.headers
             },
             success: (res: any) => {
-                arg?.success?.(res);
+                handleSuccess(res);
                 commonConsole(res, 'info', 'swan.request success');
             },
             fail: (err: any) => {
-                arg?.fail?.(err);
+                handleError(err);
                 commonConsole(err, 'error');
-                throw err;
             }
         });
 
@@ -47,13 +45,12 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
                     const line = lines[i].trim();
                     if (line) {
                         try {
-                            if (line.includes('data:')) {
-                                const processedLine = arg?.preprocessDataCallback ? arg?.preprocessDataCallback?.(line) : line;
-                                
-                                fn({ data: processedLine.replace(/^data:/, '').trim() });
-                            }
+                            const processedLine = arg?.preprocessDataCallback ? arg?.preprocessDataCallback?.(line) : line;
+                            processSseLine(processedLine, fn);
                         } catch (err) {
-                            commonConsole(err, 'error', '解析该行出错');
+                            commonConsole(err, 'error', 'Error parsing line');
+                            handleError(err);
+                            return;
                         }
                     }
                 }
