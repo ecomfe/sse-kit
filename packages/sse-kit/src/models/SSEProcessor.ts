@@ -43,8 +43,6 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
         options?.onHeadersReceived && (this.onHeadersReceived = options.onHeadersReceived);
         options?.preprocessDataCallback && (this.preprocessDataCallback = options.preprocessDataCallback);
 
-        console.info('SSEProcessor initialization parameters sse-kit@1.0.8-why.22', options);
-
         if (options.enableConsole !== undefined) {
             updateEnableConsole(options.enableConsole);
         }

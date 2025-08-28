@@ -49,7 +49,7 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
 
         function readChunk(): Promise<void> {
             return streamReader.read().then(({ done, value }) => {
-                if (state.isCompleted) return;
+                if (state.isFinished()) return;
 
                 if (done) {
                     handleSuccess(response);
@@ -75,12 +75,21 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
 
                 return readChunk();
             }).catch(error => {
-                if (!state.isCompleted) {
-                    if ((error as Error).name === 'AbortError') {
-                        handleError(new Error('Stream reading aborted by user or timeout'), 'aborted');
+                // Handle stream reading errors appropriately
+                if ((error as Error).name === 'AbortError') {
+                    if (state.isUserAborted) {
+                        // User called abort() - treat as aborted status
+                        handleError(error, 'aborted');
+                    } else if (state.isTimedOut) {
+                        // Already handled by timeout logic
+                        return;
                     } else {
-                        handleError(error as Error);
+                        // Other abort reason
+                        handleError(error, 'aborted');
                     }
+                } else if (!state.isFinished()) {
+                    // For other errors, check if request is not already finished
+                    handleError(error as Error);
                 }
             });
         }
@@ -95,10 +104,13 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
         state.markStarted();
         
         timeoutId = setTimeout(() => {
-            controller.abort();
-            cleanup();
-            const timeoutError = new Error(`Request timeout after ${timeout}ms`);
-            handleError(timeoutError, 'timeout');
+            if (!state.isFinished()) {
+                state.markTimedOut();  // 先标记超时状态
+                controller.abort();    // 然后触发abort（这会导致AbortError）
+                cleanup();
+                // 不在这里直接调用 handleError，让 .catch() 中的逻辑处理
+                // 因为 controller.abort() 会触发 fetch 的 AbortError
+            }
         }, timeout);
 
         const requestHeaders = buildRequestHeaders(headers, !!reqParams);
@@ -134,7 +146,17 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
             return Promise.resolve();
         })
         .catch(err => {
-            handleError(err);
+            if ((err as Error).name === 'AbortError') {
+                if (state.isUserAborted) {
+                    handleError(err, 'aborted');
+                } else if (state.isTimedOut) {
+                    return;
+                } else {
+                    handleError(err, 'aborted');
+                }
+            } else if (!state.isFinished()) {
+                handleError(err);
+            }
         });
 
     } catch (initialError) {
@@ -150,7 +172,7 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
         },
         abort() {
             try {
-                if (!state.isCompleted) {
+                if (!state.isFinished()) {  // 使用 isFinished() 代替 isCompleted
                     state.markAborted();
                     controller.abort();
                     cleanup();

@@ -1,6 +1,6 @@
 {
   "name": "sse-kit",
-  "version": "1.0.8-why.23",
+  "version": "1.0.9",
   "description": "",
   "main": "index.js",
   "type": "module",

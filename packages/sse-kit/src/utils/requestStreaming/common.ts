@@ -5,27 +5,50 @@ import type { RequestStreamingArgs } from './index.d';
  * Request state management class
  */
 export class RequestState {
-    public isCompleted = false;
-    public isUserAborted = false;
     public isStarted = false;
+    public isSuccessfullyCompleted = false;
+    public isUserAborted = false;
+    public isTimedOut = false;
+    public hasError = false;
 
-    public markCompleted(): void {
-        this.isCompleted = true;
+    public markSuccessfullyCompleted(): void {
+        if (!this.isFinished()) {
+            this.isSuccessfullyCompleted = true;
+        }
     }
 
     public markAborted(): void {
-        this.isUserAborted = true;
-        this.isCompleted = true;
+        if (!this.isFinished()) {
+            this.isUserAborted = true;
+        }
+    }
+
+    public markTimedOut(): void {
+        if (!this.isFinished()) {
+            this.isTimedOut = true;
+        }
+    }
+
+    public markError(): void {
+        if (!this.isFinished()) {
+            this.hasError = true;
+        }
     }
 
     public markStarted(): void {
         this.isStarted = true;
     }
 
+    public isFinished(): boolean {
+        return this.isSuccessfullyCompleted || this.isUserAborted || this.isTimedOut || this.hasError;
+    }
+
     public reset(): void {
-        this.isCompleted = false;
-        this.isUserAborted = false;
         this.isStarted = false;
+        this.isSuccessfullyCompleted = false;
+        this.isUserAborted = false;
+        this.isTimedOut = false;
+        this.hasError = false;
     }
 }
 
@@ -45,9 +68,21 @@ export const validateRequestOptions = (options: RequestStreamingArgs): void => {
  */
 export const createErrorHandler = (fail?: (err: any) => void, state?: RequestState) => {
     return (error: any, errorType: 'aborted' | 'timeout' | 'error' = 'error') => {
-        if (state?.isCompleted) return;
+        if (errorType !== 'aborted' && state?.isFinished()) {
+            return;
+        }
         
-        state?.markCompleted();
+        switch(errorType) {
+            case 'aborted':
+                break;
+            case 'timeout':
+                state?.markTimedOut();
+                break;
+            case 'error':
+                state?.markError();
+                break;
+        }
+        
         commonConsole(error, 'error', `Request ${errorType}`);
         
         const errorResponse = {
@@ -65,9 +100,9 @@ export const createErrorHandler = (fail?: (err: any) => void, state?: RequestSta
  */
 export const createSuccessHandler = (success?: (res: any) => void, state?: RequestState) => {
     return (response: any) => {
-        if (state?.isCompleted) return;
+        if (state?.isFinished()) return;  // 使用 isFinished() 而不是 isCompleted
         
-        state?.markCompleted();
+        state?.markSuccessfullyCompleted();  // 使用新的方法名
         commonConsole(response, 'info', 'Request completed successfully');
         
         const successResponse = {
