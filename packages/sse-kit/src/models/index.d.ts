@@ -12,6 +12,7 @@ export interface ConstructorArgsType<TBody extends object> {
     reqParams?: RequestStreamingArgs['reqParams'];
     enableConsole?: boolean;
     timeout?: number;
+    credentials?: 'include' | 'same-origin' | 'omit';
     onConnect?: () => void;
     onComplete?: (response: unknown) => void;
     onReconnect?: () => void;

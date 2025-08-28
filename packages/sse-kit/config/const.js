@@ -1,4 +1,4 @@
-// 需要构建的平台，对应文件后缀相同
+// Platforms to build, corresponding to file suffixes
 export const platform = ['weapp', 'swan', 'h5'];
 
 export const outputDir = 'bundles';

@@ -1,10 +1,10 @@
 import { commonConsole } from "./commonConsole";
 
 /**
- * 将 ArrayBuffer 或字符串编码为 JSON 对象
+ * Encode ArrayBuffer or string to JSON object
  *
- * @param value 需要编码的 ArrayBuffer 或字符串
- * @returns 编码后的 JSON 对象，如果解析失败则返回 unknown
+ * @param value ArrayBuffer or string to be encoded
+ * @returns Encoded JSON object, returns unknown if parsing fails
  */
 export const encodeBufferToJson = <T extends object>(value: ArrayBuffer | string): T | unknown => {
   try {
@@ -20,20 +20,19 @@ export const encodeBufferToJson = <T extends object>(value: ArrayBuffer | string
         v = decodeURIComponent(escape(String.fromCharCode(...data)));
         return JSON.parse(v) as T;
       } catch (error) {
-        console.error('非 string 类型解码异常', data);
-        v = '';
-        return JSON.parse(v)
+        commonConsole(error, 'error', 'Non-string type decoding error');
+        return undefined;
       }
     } else {
       try {
         return JSON.parse(data) as T;
       } catch(e) {
-        commonConsole(e, 'error', 'encodeBufferToJson string 类型解码异常');
+        commonConsole(e, 'error', 'encodeBufferToJson string type decoding error');
         return undefined;
       }
     }
   } catch(e)  {
-    commonConsole(e, 'error', 'encodeBufferToJson 解码异常');
+    commonConsole(e, 'error', 'encodeBufferToJson decoding error');
     return undefined;
   }
 };

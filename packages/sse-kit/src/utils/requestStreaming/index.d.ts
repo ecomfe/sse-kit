@@ -3,6 +3,7 @@ export interface RequestStreamingArgs {
     method: 'POST' | 'GET';
     headers?: Headers;
     timeout?: number;
+    credentials?: 'include' | 'same-origin' | 'omit';
     reqParams?: Record<string, string>;
     preprocessDataCallback?: (data: any) => any;
     success?: (res: any) => void;

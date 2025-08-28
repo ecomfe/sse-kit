@@ -1,16 +1,16 @@
 import { commonConsole } from "../commonConsole";
-import {processChunkData} from '../processChunkData';
-import {arrayBufferToString} from '../arrayBufferToString';
-
+import { processChunkData } from '../processChunkData';
+import { arrayBufferToString } from '../arrayBufferToString';
+import { RequestState, validateRequestOptions, createErrorHandler, createSuccessHandler, processSseLine } from './common';
 import type { RequestStreamingArgs, RequestStreamingInstance, ChunkReceivedCallbackType } from './index.d';
 
 export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => {
     try {
-        if (!(arg?.url || arg?.method)) {
-            const err = new Error('url or method is required');
-            commonConsole(err, 'error');
-            throw err;
-        }
+        validateRequestOptions(arg);
+        
+        const state = new RequestState();
+        const handleError = createErrorHandler(arg.fail, state);
+        const handleSuccess = createSuccessHandler(arg.success, state);
         let chunkBuffer = '';
 
         const r = wx?.request({
@@ -25,13 +25,12 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
                 ...arg?.headers
             },
             success: (res: any) => {
-                arg?.success?.(res);
-                commonConsole(res, 'info', 'swan.request success');
+                handleSuccess(res);
+                commonConsole(res, 'info', 'wx.request success');
             },
             fail: (err: any) => {
-                arg?.fail?.(err);
+                handleError(err);
                 commonConsole(err, 'error');
-                throw err;
             }
         })
 
@@ -50,6 +49,8 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
                     }
                 } catch(err) {
                     commonConsole(err, 'error', 'decodeURIComponent error');
+                    handleError(err);
+                    return;
                 }
                 
                 const result = processChunkData(dataForSplit, chunkBuffer);
