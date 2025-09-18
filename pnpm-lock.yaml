@@ -95,10 +95,6 @@ importers:
         version: 5.7.3
 
   packages/sse-kit:
-    dependencies:
-      text-encoding-shim:
-        specifier: 1.0.5
-        version: 1.0.5
     devDependencies:
       '@rollup/plugin-babel':
         specifier: ^6.0.4
@@ -7478,9 +7474,6 @@ packages:
   test-exclude@6.0.0:
     resolution: {integrity: sha1-BKhphmHYBepvopO2y55jrARO8V4=}
     engines: {node: '>=8'}
-
-  text-encoding-shim@1.0.5:
-    resolution: {integrity: sha512-H7yYW+jRn4yhu60ygZ2f/eMhXPITRt4QSUTKzLm+eCaDsdX8avmgWpmtmHAzesjBVUTAypz9odu5RKUjX5HNYA==}
 
   text-table@0.2.0:
     resolution: {integrity: sha1-f17oI66AUgfACvLfSoTsP8+lcLQ=}
@@ -17019,8 +17012,6 @@ snapshots:
       '@istanbuljs/schema': 0.1.3
       glob: 7.2.3
       minimatch: 3.1.2
-
-  text-encoding-shim@1.0.5: {}
 
   text-table@0.2.0: {}
 
