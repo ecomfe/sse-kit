@@ -1,6 +1,6 @@
 {
   "name": "sse-kit",
-  "version": "1.0.10-beta.6",
+  "version": "1.0.10",
   "description": "",
   "main": "index.js",
   "type": "module",
