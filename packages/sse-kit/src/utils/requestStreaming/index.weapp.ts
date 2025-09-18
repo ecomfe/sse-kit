@@ -12,6 +12,7 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
         const handleError = createErrorHandler(arg.fail, state);
         const handleSuccess = createSuccessHandler(arg.success, state);
         let chunkBuffer = '';
+        let pendingBytes = new Uint8Array(0); // Buffer for incomplete UTF-8 sequences
 
         const r = wx?.request({
             url: arg?.url,
@@ -41,16 +42,24 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
 
                 let dataForSplit = '';
 
-                try {
-                    if (chunk?.data instanceof ArrayBuffer) {
-                        dataForSplit = arrayBufferToString(chunk?.data);
-                    } else {
-                        dataForSplit = chunk?.data || '';
+                if (chunk?.data instanceof ArrayBuffer) {
+                    const currentBytes = new Uint8Array(chunk?.data);
+                    const combinedBytes = new Uint8Array(pendingBytes.length + currentBytes.length);
+                    
+                    combinedBytes.set(pendingBytes);
+                    combinedBytes.set(currentBytes, pendingBytes.length);
+                    
+                    try {
+                        dataForSplit = arrayBufferToString(combinedBytes.buffer);
+                        pendingBytes = new Uint8Array(0);
+                    } catch(err) {
+                        commonConsole(err, 'error', 'decodeURIComponent error');
+                        
+                        pendingBytes = combinedBytes;
+                        return;
                     }
-                } catch(err) {
-                    commonConsole(err, 'error', 'decodeURIComponent error');
-                    handleError(err);
-                    return;
+                } else {
+                    dataForSplit = chunk?.data || '';
                 }
                 
                 const result = processChunkData(dataForSplit, chunkBuffer);
