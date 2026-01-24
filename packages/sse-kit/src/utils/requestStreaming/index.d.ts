@@ -1,7 +1,21 @@
+export type HeadersType = Headers | Record<string, string>;
+
+/**
+ * SSE event chunk with event type
+ */
+export interface SSEChunk {
+    /** Event type, defaults to 'message' */
+    event: string;
+    /** Event data */
+    data: string;
+    /** Event ID (optional) */
+    id?: string;
+}
+
 export interface RequestStreamingArgs {
     url: `https://${string}` | `http://${string}`;
     method: 'POST' | 'GET';
-    headers?: Headers;
+    headers?: HeadersType;
     timeout?: number;
     credentials?: 'include' | 'same-origin' | 'omit';
     reqParams?: Record<string, string>;
@@ -10,8 +24,8 @@ export interface RequestStreamingArgs {
     fail?: (err: any) => void;
 }
 
-export type HeadersReceivedCallbackType = (v: Headers) => void;
-export type ChunkReceivedCallbackType = (v: {data: ArrayBuffer | string}) => void;
+export type HeadersReceivedCallbackType = (v: HeadersType) => void;
+export type ChunkReceivedCallbackType = (v: SSEChunk) => void;
 
 export interface RequestStreamingInstance {
     onChunkReceived: (fn: ChunkReceivedCallbackType) => void;

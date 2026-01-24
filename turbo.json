@@ -50,6 +50,14 @@
                 "sse-kit#debug",
                 "local-service#debug"
             ]
+        },
+        "test": {
+            "cache": false,
+            "dependsOn": []
+        },
+        "sse-kit#test": {
+            "cache": false,
+            "dependsOn": []
         }
     }
 }

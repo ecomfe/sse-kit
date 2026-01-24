@@ -1,10 +1,10 @@
 import { commonConsole } from "../commonConsole";
-import { RequestState, validateRequestOptions, createErrorHandler, createSuccessHandler, processSseLine, buildRequestHeaders } from './common';
+import { RequestState, validateRequestOptions, createErrorHandler, createSuccessHandler, createSSEParser, buildRequestHeaders } from './common';
 import type { RequestStreamingArgs, RequestStreamingInstance, ChunkReceivedCallbackType, HeadersReceivedCallbackType } from './index.d';
 
 export function request(options: RequestStreamingArgs): RequestStreamingInstance {
     validateRequestOptions(options);
-    
+
     const {
         url,
         method,
@@ -20,7 +20,7 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
     const state = new RequestState();
     const handleError = createErrorHandler(fail, state);
     const handleSuccess = createSuccessHandler(success, state);
-    
+
     let onChunkReceivedCallback: ChunkReceivedCallbackType = () => { };
     let onHeadersReceivedCallback: HeadersReceivedCallbackType = () => { };
     let timeoutId: number | undefined;
@@ -44,34 +44,26 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
 
     const processStream = (streamReader: ReadableStreamDefaultReader<Uint8Array>, response: Response) => {
         reader = streamReader; // Save reader reference for cleanup
-        let buffer = '';
         const decoder = new TextDecoder();
+
+        // Create SSE parser that emits complete events with event type
+        const parser = createSSEParser((event) => {
+            onChunkReceivedCallback(event);
+        });
 
         function readChunk(): Promise<void> {
             return streamReader.read().then(({ done, value }) => {
                 if (state.isFinished()) return;
 
                 if (done) {
+                    // Flush any remaining data in parser
+                    parser.flush();
                     handleSuccess(response);
                     return;
                 }
 
                 const chunkText = decoder.decode(value, { stream: true });
-                buffer += chunkText;
-
-                const lines = buffer.split('\n');
-                for (let i = 0; i < lines.length - 1; i++) {
-                    const line = lines[i].trim();
-                    if (line) {
-                        try {
-                            processSseLine(line, onChunkReceivedCallback);
-                        } catch (err) {
-                            handleError(err as Error);
-                            return;
-                        }
-                    }
-                }
-                buffer = lines[lines.length - 1];
+                parser.feed(chunkText);
 
                 return readChunk();
             }).catch(error => {
@@ -102,14 +94,14 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
             throw new Error('Request already started');
         }
         state.markStarted();
-        
+
+        // Connection timeout: abort if no response received within timeout period
+        // Once response is received, timeout is cleared (see .then() handler below)
         timeoutId = setTimeout(() => {
             if (!state.isFinished()) {
-                state.markTimedOut();  // 先标记超时状态
-                controller.abort();    // 然后触发abort（这会导致AbortError）
+                state.markTimedOut();
+                controller.abort();
                 cleanup();
-                // 不在这里直接调用 handleError，让 .catch() 中的逻辑处理
-                // 因为 controller.abort() 会触发 fetch 的 AbortError
             }
         }, timeout);
 
@@ -126,6 +118,12 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
             ...(credentials ? { credentials } : {})
         })
         .then(response => {
+            // Clear timeout once response is received (connection established)
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = undefined;
+            }
+
             if (!response.ok) {
                 // Handle HTTP error status codes
                 return response.text().then(errorBody => {
@@ -141,7 +139,7 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
                 handleSuccess(null);
                 return Promise.resolve();
             }
-            
+
             processStream(response.body.getReader(), response);
             return Promise.resolve();
         })
@@ -172,7 +170,7 @@ export function request(options: RequestStreamingArgs): RequestStreamingInstance
         },
         abort() {
             try {
-                if (!state.isFinished()) {  // 使用 isFinished() 代替 isCompleted
+                if (!state.isFinished()) {
                     state.markAborted();
                     controller.abort();
                     cleanup();

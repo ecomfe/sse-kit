@@ -4,8 +4,10 @@ import { encodeBufferToJson } from '../utils/encodeBuffer';
 import { createAsyncQueue } from '../utils/createAsyncQueue';
 import { commonConsole, updateEnableConsole } from "../utils/commonConsole";
 
-import type { ISSE, ConstructorArgsType } from './index.d';
-import type {RequestStreamingInstance} from '../utils/requestStreaming/index.d';
+import type { ISSE, ConstructorArgsType, SSEEvent } from './index.d';
+import type { RequestStreamingInstance, HeadersType, SSEChunk } from '../utils/requestStreaming/index.d';
+
+type ConnectionState = 'idle' | 'connecting' | 'connected' | 'closed';
 
 export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
     public id: symbol;
@@ -24,8 +26,15 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
 
     private onError?: (err: Error) => void;
     private onComplete?: (response: unknown) => void;
+    private onConnectCallback?: () => void;
     private onHeadersReceived?: ConstructorArgsType<TBody>['onHeadersReceived'];
     private preprocessDataCallback?: (data: string | ArrayBuffer) => string | ArrayBuffer;
+
+    // Connection state management
+    private connectionState: ConnectionState = 'idle';
+    private eventQueue = createAsyncQueue<SSEEvent<TBody>>();
+    private successResponse: unknown = null;
+    private successCalled: boolean = false;
 
     constructor(options: ConstructorArgsType<TBody>) {
         commonConsole(options, 'info', 'SSEProcessor initialization parameters');
@@ -40,6 +49,7 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
         options?.credentials && (this.credentials = options.credentials);
         options?.onError && (this.onError = options.onError);
         options?.onComplete && (this.onComplete = options.onComplete);
+        options?.onConnect && (this.onConnectCallback = options.onConnect);
         options?.onHeadersReceived && (this.onHeadersReceived = options.onHeadersReceived);
         options?.preprocessDataCallback && (this.preprocessDataCallback = options.preprocessDataCallback);
 
@@ -48,76 +58,142 @@ export class SSEProcessor<TBody extends object> implements ISSE<TBody> {
         }
     }
 
-    public async *message(): AsyncIterableIterator<TBody> {
-        try {
-            const queue = createAsyncQueue<any>();
-            let successCalled = false;
-            let successResponse: any;
+    /**
+     * Establish SSE connection
+     * Can be called multiple times, only takes effect on first call
+     * Returns this for method chaining
+     */
+    public connect(): this {
+        if (this.connectionState !== 'idle') {
+            commonConsole('Connection already established or in progress v2.0!', 'info', 'SSEProcessor');
+            return this;
+        }
 
-            const r = request({
-                url: this.url,
-                method: this.method,
-                reqParams: {
-                    ...this.reqParams
-                },
-                ...(this.credentials ? { credentials: this.credentials } : {}),
-                timeout: this.timeout,
-                headers: { ...this.headers } as Headers,
-                preprocessDataCallback: this.preprocessDataCallback,
-                success: (res: any) => {
-                    successResponse = res;
-                    successCalled = true;
-                    queue.end();
-                },
-                fail: (err: any) => {
-                    commonConsole(err, 'error', 'Request failed');
-                    this.onError?.(err);
-                    queue.end();
-                }
-            })
-            this.requestInstance = r;
+        this.connectionState = 'connecting';
+        this.initConnection();
+        return this;
+    }
 
-            r?.onChunkReceived((chunk: { data: ArrayBuffer | string }) => {
-                commonConsole(chunk?.data, 'info', 'SSEProcessor chunk data')
+    /**
+     * Initialize the actual connection
+     */
+    private initConnection(): void {
+        const r = request({
+            url: this.url,
+            method: this.method,
+            reqParams: {
+                ...this.reqParams
+            },
+            ...(this.credentials ? { credentials: this.credentials } : {}),
+            timeout: this.timeout,
+            headers: { ...this.headers } as HeadersType,
+            preprocessDataCallback: this.preprocessDataCallback,
+            success: (res: unknown) => {
+                this.successResponse = res;
+                this.successCalled = true;
+                this.eventQueue.end();
+            },
+            fail: (err: Error) => {
+                commonConsole(err, 'error', 'Request failed');
+                this.connectionState = 'closed';
+                this.onError?.(err);
+                this.eventQueue.end();
+            }
+        });
 
-                const parsed = encodeBufferToJson<TBody>(chunk?.data);
-                
-                if (parsed !== undefined) {
-                    queue.push(parsed);
-                    this.eventId += 1;
-                    this.body?.push(parsed as TBody);
+        this.requestInstance = r;
+
+        r?.onChunkReceived((chunk: SSEChunk) => {
+            commonConsole(chunk, 'info', 'SSEProcessor chunk received');
+
+            // Parse the data field to JSON
+            let parsed = encodeBufferToJson<TBody>(chunk.data);
+
+            // If JSON parsing fails, wrap raw string as object for non-message events
+            // This handles cases like "data: end" or "data: done"
+            if (parsed === undefined) {
+                // For special events (non-message), emit with raw data wrapper
+                if (chunk.event && chunk.event !== 'message') {
+                    parsed = { raw: chunk.data } as unknown as TBody;
                 } else {
+                    // For message events, skip invalid JSON data
                     commonConsole('Data parsing failed, skipping this data', 'warn');
+                    return;
                 }
-            });
+            }
 
-            r?.onHeadersReceived((chunk: Headers) => {
-                this.onHeadersReceived?.(chunk)
-            });
+            const event: SSEEvent<TBody> = {
+                event: chunk.event || 'message',
+                data: parsed as TBody,
+                id: chunk.id
+            };
+            this.eventQueue.push(event);
+            this.eventId += 1;
+            this.body?.push(parsed as TBody);
+        });
 
+        r?.onHeadersReceived((headers: HeadersType) => {
+            this.connectionState = 'connected';
+            this.onConnectCallback?.();
+            this.onHeadersReceived?.(headers);
+        });
+    }
+
+    /**
+     * Get iterator for all events (with event type)
+     * Automatically connects if not already connected
+     */
+    public async *events(): AsyncIterableIterator<SSEEvent<TBody>> {
+        // Ensure connection is established
+        this.connect();
+
+        try {
             while (true) {
-                const { value, done } = await queue.next();
+                const { value, done } = await this.eventQueue.next();
                 if (done) {
                     break;
                 }
-                yield value as TBody;
+                yield value;
             }
 
-            if (successCalled) {
-                commonConsole(successResponse, 'info', 'Request completed');
-                this.onComplete?.(successResponse);
+            // Trigger completion callback
+            if (this.successCalled) {
+                commonConsole(this.successResponse, 'info', 'Request completed');
+                this.onComplete?.(this.successResponse);
             }
-        } catch (error) {
-            throw error;
+        } finally {
+            this.connectionState = 'closed';
         }
-    };
+    }
 
-    public getCurrentEventId() {
+    /**
+     * Get iterator for message events only (backward compatible)
+     * Automatically connects if not already connected
+     */
+    public async *message(): AsyncIterableIterator<TBody> {
+        for await (const event of this.events()) {
+            if (event.event === 'message') {
+                yield event.data;
+            }
+        }
+    }
+
+    /**
+     * Get current event count
+     */
+    public getCurrentEventId(): number {
         return this.eventId;
-    };
+    }
 
-
-    public close() {
+    /**
+     * Close connection
+     */
+    public close(): void {
+        if (this.connectionState === 'closed') {
+            return;
+        }
+        this.connectionState = 'closed';
         this.requestInstance?.abort();
-    };
+        this.eventQueue.end();
+    }
 }

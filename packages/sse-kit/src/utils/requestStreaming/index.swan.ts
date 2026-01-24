@@ -1,16 +1,43 @@
 import { commonConsole } from "../commonConsole";
-import { RequestState, validateRequestOptions, createErrorHandler, createSuccessHandler, processSseLine } from './common';
-import type { RequestStreamingArgs, RequestStreamingInstance, ChunkReceivedCallbackType } from './index.d';
+import { RequestState, validateRequestOptions, createErrorHandler, createSuccessHandler, createSSEParser } from './common';
+import type { RequestStreamingArgs, RequestStreamingInstance, ChunkReceivedCallbackType, HeadersReceivedCallbackType, SSEChunk } from './index.d';
 
 export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => {
     try {
         validateRequestOptions(arg);
-        
+
         const state = new RequestState();
         const handleError = createErrorHandler(arg.fail, state);
         const handleSuccess = createSuccessHandler(arg.success, state);
-        let chunkBuffer = '';
-            
+
+        // Callbacks to be set by the caller
+        let chunkCallback: ChunkReceivedCallbackType | null = null;
+        let headersCallback: HeadersReceivedCallbackType | null = null;
+
+        // Buffer for events that arrive before callback is set
+        const pendingEvents: SSEChunk[] = [];
+        let callbackReady = false;
+
+        // Function to deliver event (either immediately or buffer it)
+        const deliverEvent = (event: SSEChunk) => {
+            if (callbackReady && chunkCallback) {
+                chunkCallback(event);
+            } else {
+                pendingEvents.push(event);
+            }
+        };
+
+        // Create SSE parser
+        const parser = createSSEParser((event) => {
+            commonConsole(event, 'info', 'swan SSE parser output');
+            // Apply preprocessDataCallback if provided
+            if (arg?.preprocessDataCallback) {
+                event.data = arg.preprocessDataCallback(event.data);
+                commonConsole(event.data, 'info', 'swan after preprocessDataCallback');
+            }
+            deliverEvent(event);
+        });
+
         const r = swan?.request({
             url: arg?.url,
             method: arg?.method,
@@ -24,6 +51,8 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
                 ...arg?.headers
             },
             success: (res: any) => {
+                // Flush any remaining data in parser
+                parser.flush();
                 handleSuccess(res);
                 commonConsole(res, 'info', 'swan.request success');
             },
@@ -33,34 +62,39 @@ export const request = (arg: RequestStreamingArgs): RequestStreamingInstance => 
             }
         });
 
-        const originFunction = r.onChunkReceived.bind(r);
-        r.onChunkReceived = (fn: ChunkReceivedCallbackType) => {
-            originFunction((chunk: { data: string }) => {
-                let dataStr: string = chunk.data;
+        // Set up chunk listener directly on the original request object
+        r.onChunkReceived((chunk: { data: string }) => {
+            commonConsole(chunk, 'info', 'swan.request onChunkReceived raw');
+            // Feed data to SSE parser
+            parser.feed(chunk.data);
+        });
 
-                chunkBuffer += dataStr;
-                const lines = chunkBuffer.split('\n');
-        
-                for (let i = 0; i < lines.length - 1; i++) {
-                    const line = lines[i].trim();
-                    if (line) {
-                        try {
-                            const processedLine = arg?.preprocessDataCallback ? arg?.preprocessDataCallback?.(line) : line;
-                            processSseLine(processedLine, fn);
-                        } catch (err) {
-                            commonConsole(err, 'error', 'Error parsing line');
-                            handleError(err);
-                            return;
-                        }
-                    }
+        // Set up headers listener
+        r.onHeadersReceived?.((res: { header: Record<string, string> }) => {
+            commonConsole(res, 'info', 'swan.request onHeadersReceived');
+            headersCallback?.(res.header);
+        });
+
+        // Return wrapper object with our own onChunkReceived/onHeadersReceived
+        return {
+            onChunkReceived: (fn: ChunkReceivedCallbackType) => {
+                chunkCallback = fn;
+                callbackReady = true;
+                // Deliver any pending events
+                while (pendingEvents.length > 0) {
+                    const event = pendingEvents.shift()!;
+                    fn(event);
                 }
-                chunkBuffer = lines[lines.length - 1];
-            });
+            },
+            onHeadersReceived: (fn: HeadersReceivedCallbackType) => {
+                headersCallback = fn;
+            },
+            abort: () => {
+                r.abort?.();
+            }
         };
-
-        return r as RequestStreamingInstance;
     } catch (e) {
         commonConsole(e, 'error');
         throw e;
     }
-}
+};
