@@ -1,5 +1,5 @@
 import { commonConsole } from '../commonConsole';
-import type { RequestStreamingArgs } from './index.d';
+import type { RequestStreamingArgs, SSEChunk } from './index.d';
 
 /**
  * Request state management class
@@ -100,9 +100,9 @@ export const createErrorHandler = (fail?: (err: any) => void, state?: RequestSta
  */
 export const createSuccessHandler = (success?: (res: any) => void, state?: RequestState) => {
     return (response: any) => {
-        if (state?.isFinished()) return;  // 使用 isFinished() 而不是 isCompleted
-        
-        state?.markSuccessfullyCompleted();  // 使用新的方法名
+        if (state?.isFinished()) return;
+
+        state?.markSuccessfullyCompleted();
         commonConsole(response, 'info', 'Request completed successfully');
         
         const successResponse = {
@@ -139,13 +139,100 @@ export const buildRequestHeaders = (headers: Record<string, any> = {}, hasBody =
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive'
     };
-    
+
     if (hasBody) {
         baseHeaders['Content-Type'] = 'application/json';
     }
-    
+
     return {
         ...baseHeaders,
         ...headers
     };
 };
+
+/**
+ * SSE parse buffer for tracking event state
+ */
+interface SSEParseBuffer {
+    event: string;
+    data: string[];
+    id?: string;
+}
+
+/**
+ * Create SSE event parser
+ * Parses SSE protocol format and emits complete events
+ *
+ * SSE format:
+ * event: eventName
+ * data: line1
+ * data: line2
+ * id: 123
+ *
+ * (empty line signals end of event)
+ */
+export function createSSEParser(onEvent: (event: SSEChunk) => void) {
+    let buffer: SSEParseBuffer = { event: '', data: [] };
+    let textBuffer = '';
+
+    return {
+        /**
+         * Feed chunk data to parser
+         */
+        feed(chunk: string): void {
+            textBuffer += chunk;
+            const lines = textBuffer.split('\n');
+            textBuffer = lines.pop() || '';  // Keep incomplete line for next chunk
+
+            for (const line of lines) {
+                const trimmed = line.trimEnd();  // Only trim end to preserve data spacing
+
+                if (trimmed.startsWith('event:')) {
+                    buffer.event = trimmed.slice(6).trim();
+                } else if (trimmed.startsWith('data:')) {
+                    buffer.data.push(trimmed.slice(5).trimStart());
+                } else if (trimmed.startsWith('id:')) {
+                    buffer.id = trimmed.slice(3).trim();
+                } else if (trimmed === '') {
+                    // Empty line = event complete
+                    if (buffer.data.length > 0) {
+                        onEvent({
+                            event: buffer.event || 'message',
+                            data: buffer.data.join('\n'),
+                            id: buffer.id
+                        });
+                    }
+                    // Reset buffer for next event
+                    buffer = { event: '', data: [] };
+                }
+                // Ignore other lines (comments starting with :, etc.)
+            }
+        },
+
+        /**
+         * Flush any remaining data (call when stream ends)
+         */
+        flush(): void {
+            // Process any remaining text in buffer
+            if (textBuffer) {
+                const trimmed = textBuffer.trimEnd();
+                if (trimmed.startsWith('data:')) {
+                    buffer.data.push(trimmed.slice(5).trimStart());
+                }
+            }
+
+            // Emit final event if there's data
+            if (buffer.data.length > 0) {
+                onEvent({
+                    event: buffer.event || 'message',
+                    data: buffer.data.join('\n'),
+                    id: buffer.id
+                });
+            }
+
+            // Reset
+            buffer = { event: '', data: [] };
+            textBuffer = '';
+        }
+    };
+}

@@ -10,10 +10,17 @@
     "dev:weapp": "turbo run dev:weapp",
     "dev:swan": "turbo run dev:swan",
     "dev:h5": "turbo run dev:h5",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "turbo run test --filter=sse-kit --filter=local-service",
+    "test:sdk": "turbo run test --filter=sse-kit",
+    "test:coverage": "turbo run test:coverage --filter=sse-kit",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm build:sdk && changeset publish"
   },
   "packageManager": "pnpm@9.0.0",
   "devDependencies": {
+    "@changesets/cli": "^2.27.1",
     "turbo": "^2.3.3"
   },
   "keywords": [],
